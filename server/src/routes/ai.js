@@ -98,7 +98,7 @@ Rules:
         console.error('Process voice error:', error);
         res.status(500).json({
             success: false,
-            error: { code: 'INTERNAL_ERROR', message: 'Failed to process voice input' }
+            error: { code: 'INTERNAL_ERROR', message: error.message, stack: error.stack }
         });
     }
 });
