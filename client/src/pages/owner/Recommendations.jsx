@@ -87,8 +87,8 @@ export default function Recommendations() {
             const highMarginItems = items.filter(i => i.marginLevel === 'High');
             const lowMarginItems = items.filter(i => i.marginLevel === 'Low');
 
-            // ---- Build one unified list of recommendations ----
-            const recs = [];
+            // ---- Build analytics recommendations ----
+            const analyticsRecs = [];
 
             items.forEach(item => {
                 const isHigh = item.marginLevel === 'High';
@@ -97,22 +97,22 @@ export default function Recommendations() {
                 const isFastMed = item.velocity === 'Fast' || item.velocity === 'Medium';
                 const isDeclining = item.trend === 'down';
 
-                // High risk: low margin + slow + possibly declining → remove or rework
+                // High risk: low margin + slow → remove or rework
                 if (isLow && isSlow) {
-                    recs.push({
+                    analyticsRecs.push({
                         priority: 0,
                         icon: '🗑️',
                         title: `Remove "${item.name}" from your menu`,
                         description: `This item has low profit (₹${item.contributionMargin.toFixed(0)} margin) and very few orders (${item.ordersPerDay}/day). It's not contributing to your revenue. Consider removing it or replacing with something new.`,
                     });
-                    return; // skip other rules for this item
+                    return;
                 }
 
                 // Declining demand + moderate/low margin → take action
                 if (isDeclining && !isHigh) {
-                    recs.push({
+                    analyticsRecs.push({
                         priority: 1,
-                        icon: '�',
+                        icon: '📉',
                         title: `"${item.name}" is losing customers`,
                         description: `Orders for this item are going down. Try improving the recipe, changing the presentation, or running a limited-time discount to bring attention back.`,
                     });
@@ -120,9 +120,9 @@ export default function Recommendations() {
 
                 // Low margin + popular → bundle into combos
                 if (isLow && isFastMed) {
-                    recs.push({
+                    analyticsRecs.push({
                         priority: 2,
-                        icon: '�',
+                        icon: '📦',
                         title: `Create a combo with "${item.name}"`,
                         description: `This is a popular item but the profit is low (${item.marginPercentage}%). Add it to a combo with a higher-margin item to increase your overall earnings per order.`,
                     });
@@ -130,7 +130,7 @@ export default function Recommendations() {
 
                 // High margin + popular → increase price
                 if (isHigh && isFastMed) {
-                    recs.push({
+                    analyticsRecs.push({
                         priority: 3,
                         icon: '💰',
                         title: `Increase the price of "${item.name}"`,
@@ -140,9 +140,9 @@ export default function Recommendations() {
 
                 // High margin + slow → promote it
                 if (isHigh && isSlow) {
-                    recs.push({
+                    analyticsRecs.push({
                         priority: 4,
-                        icon: '�',
+                        icon: '📣',
                         title: `Promote "${item.name}" more`,
                         description: `This item earns you good profit (₹${item.contributionMargin.toFixed(0)} per sale) but not many people are ordering it. Place it at the top of your menu, add a photo, or feature it on social media.`,
                     });
@@ -152,28 +152,32 @@ export default function Recommendations() {
             // Slow items → pair with fast items
             slowItems.forEach(slow => {
                 const pair = fastItems.find(f => f.name !== slow.name);
-                if (pair && !recs.find(r => r.title.includes(slow.name) && r.title.includes('combo'))) {
-                    recs.push({
+                if (pair && !analyticsRecs.find(r => r.title.includes(slow.name) && r.title.includes('combo'))) {
+                    analyticsRecs.push({
                         priority: 5,
-                        icon: '�',
+                        icon: '🔗',
                         title: `Bundle "${slow.name}" with "${pair.name}"`,
                         description: `"${slow.name}" doesn't sell much on its own. Pair it with your popular "${pair.name}" as a combo deal — this can increase your average order value.`,
                     });
                 }
             });
 
-            // Weekend offers
+            // Sort analytics recs by priority and take top 5
+            analyticsRecs.sort((a, b) => a.priority - b.priority);
+            const top5 = analyticsRecs.slice(0, 5);
+
+            // ---- Build event / promo recommendations (pick up to 3) ----
+            const eventRecs = [];
+
             if (isWeekendApproaching()) {
-                recs.push({
-                    priority: 6,
+                eventRecs.push({
                     icon: '🎉',
                     title: 'Create weekend combo deals',
                     description: 'The weekend is approaching — a great time to offer family packs, buy-one-get-one deals, or special combo offers to drive more orders.',
                 });
 
                 if (fastItems.length >= 2) {
-                    recs.push({
-                        priority: 6,
+                    eventRecs.push({
                         icon: '🍕',
                         title: `Weekend Special: "${fastItems[0].name}" + "${fastItems[1].name}"`,
                         description: `Both items are customer favorites. Offer them together at a 10–15% discount this weekend to attract more orders.`,
@@ -181,32 +185,36 @@ export default function Recommendations() {
                 }
             }
 
-            // Festival offers
             const festival = getUpcomingFestival();
             if (festival) {
-                recs.push({
-                    priority: 6,
+                eventRecs.push({
                     icon: '🪔',
                     title: `${festival} is coming — plan festive offers!`,
                     description: `Create special festive combos, limited-time menu items, or themed packaging for ${festival}. Promote on social media to attract more customers.`,
                 });
             }
 
-            // General strategic tip
-            recs.push({
-                priority: 7,
+            eventRecs.push({
                 icon: '📅',
                 title: 'Run weekly specials to build habits',
                 description: 'Schedule recurring promotions like "Taco Tuesday" or "Fry-day Deals". This builds repeat customer habits and creates predictable revenue bumps.',
             });
 
-            // Sort by priority (most important first)
-            recs.sort((a, b) => a.priority - b.priority);
+            eventRecs.push({
+                icon: '📱',
+                title: 'Share your best dishes on social media',
+                description: 'Post photos of your top-selling items on Instagram and WhatsApp Status. A good food photo can bring in new customers without spending on ads.',
+            });
 
-            setRecommendations(recs);
+            const top3Events = eventRecs.slice(0, 3);
+
+            // ---- Merge into final list of 8 ----
+            const finalRecs = [...top5, ...top3Events];
+
+            setRecommendations(finalRecs);
             setSummary({
                 totalItems: items.length,
-                totalRecs: recs.length,
+                totalRecs: finalRecs.length,
                 highMargin: highMarginItems.length,
                 lowMargin: lowMarginItems.length,
                 fast: fastItems.length,
