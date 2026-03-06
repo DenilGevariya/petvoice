@@ -183,6 +183,30 @@ export default function Recommendations() {
         }
     };
 
+    const handleApplyDiscount = async (item) => {
+        const key = `discount-${item.menuItemId}`;
+        setActionLoading(prev => ({ ...prev, [key]: true }));
+        try {
+            await api.updateMenuItem(item.menuItemId, {
+                name: item.name,
+                price: item.discountedPrice,
+                costPrice: item.costPrice,
+                isAvailable: true,
+                isVeg: item.isVeg ?? false,
+                isBestseller: item.isBestseller ?? false,
+                spiceLevel: item.spiceLevel ?? 0,
+                preparationTime: item.preparationTime ?? 15,
+                imageUrl: item.imageUrl,
+            });
+            toast.success(`"${item.name}" price reduced to ₹${item.discountedPrice}!`);
+            setDiscountItems(prev => prev.filter(i => i.menuItemId !== item.menuItemId));
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setActionLoading(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
     // ------- Render -------
 
     const ItemImage = ({ src, name }) => (
@@ -367,6 +391,13 @@ export default function Recommendations() {
                                             <div className="rec-card-reason">
                                                 {item.trend === 'down' ? 'Demand is declining' : 'Moderate demand'} — a {item.discountPct}% discount can attract more customers and increase order volume.
                                             </div>
+                                            <button
+                                                className="btn btn-sm rec-action-btn rec-action-btn--amber"
+                                                disabled={actionLoading[`discount-${item.menuItemId}`]}
+                                                onClick={() => handleApplyDiscount(item)}
+                                            >
+                                                {actionLoading[`discount-${item.menuItemId}`] ? 'Applying...' : `Apply ${item.discountPct}% Discount on ${item.name}`}
+                                            </button>
                                         </div>
                                     </div>
                                 )) : (

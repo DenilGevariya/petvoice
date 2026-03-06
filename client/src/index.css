@@ -2343,6 +2343,11 @@ img {
   color: white;
 }
 
+.rec-action-btn--amber {
+  background: #d97706;
+  color: white;
+}
+
 .rec-empty {
   padding: 24px 16px;
   text-align: center;
