@@ -11,6 +11,7 @@ import HiddenStars from './pages/owner/HiddenStars';
 import RiskDetection from './pages/owner/RiskDetection';
 import Recommendations from './pages/owner/Recommendations';
 import PriceOptimization from './pages/owner/PriceOptimization';
+import Suggestions from './pages/owner/Suggestions';
 import VoiceCopilot from './pages/customer/VoiceCopilot';
 import OrderHistory from './pages/customer/OrderHistory';
 import SetupRestaurant from './pages/owner/SetupRestaurant';
@@ -61,6 +62,7 @@ function AppRoutes() {
       <Route path="/owner/hidden-stars" element={<ProtectedRoute role="owner"><HiddenStars /></ProtectedRoute>} />
       <Route path="/owner/risk-detection" element={<ProtectedRoute role="owner"><RiskDetection /></ProtectedRoute>} />
       <Route path="/owner/combo-pricing" element={<ProtectedRoute role="owner"><PriceOptimization /></ProtectedRoute>} />
+      <Route path="/owner/suggestions" element={<ProtectedRoute role="owner"><Suggestions /></ProtectedRoute>} />
       <Route path="/owner/setup" element={<ProtectedRoute role="owner"><SetupRestaurant /></ProtectedRoute>} />
 
       {/* Customer Routes */}

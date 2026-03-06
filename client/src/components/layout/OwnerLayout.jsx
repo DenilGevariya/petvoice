@@ -20,6 +20,7 @@ const intelligenceNav = [
     { path: '/owner/hidden-stars', label: 'Hidden Stars', icon: HiOutlineStar },
     { path: '/owner/risk-detection', label: 'Risk Detection', icon: HiOutlineExclamationCircle },
     { path: '/owner/combo-pricing', label: 'Combo & Pricing', icon: HiOutlineCurrencyDollar },
+    { path: '/owner/suggestions', label: 'Suggestions', icon: HiOutlineSparkles },
 ];
 
 export default function OwnerLayout({ children }) {
