@@ -9,6 +9,7 @@ const menuRoutes = require('./routes/menu');
 const orderRoutes = require('./routes/orders');
 const analyticsRoutes = require('./routes/analytics');
 const aiRoutes = require('./routes/ai');
+const uploadRoutes = require('./routes/upload');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -43,6 +44,7 @@ app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -89,7 +89,7 @@ router.get('/:restaurantId', async (req, res) => {
 // Create menu item
 router.post('/', authMiddleware, ownerMiddleware, async (req, res) => {
     try {
-        const { restaurantId, categoryId, name, description, price, costPrice, isAvailable, isVeg, isBestseller, spiceLevel, preparationTime } = req.body;
+        const { restaurantId, categoryId, name, description, price, costPrice, isAvailable, isVeg, isBestseller, spiceLevel, preparationTime, imageUrl } = req.body;
 
         // Verify ownership
         const ownership = await query('SELECT id FROM restaurants WHERE id = $1 AND owner_id = $2', [restaurantId, req.user.id]);
@@ -98,10 +98,10 @@ router.post('/', authMiddleware, ownerMiddleware, async (req, res) => {
         }
 
         const result = await query(
-            `INSERT INTO menu_items (restaurant_id, category_id, name, description, price, cost_price, is_available, is_veg, is_bestseller, spice_level, preparation_time)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            `INSERT INTO menu_items (restaurant_id, category_id, name, description, price, cost_price, is_available, is_veg, is_bestseller, spice_level, preparation_time, image_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
-            [restaurantId, categoryId || null, name, description || null, price, costPrice || 0, isAvailable !== false, isVeg || false, isBestseller || false, spiceLevel || 0, preparationTime || 15]
+            [restaurantId, categoryId || null, name, description || null, price, costPrice || 0, isAvailable !== false, isVeg || false, isBestseller || false, spiceLevel || 0, preparationTime || 15, imageUrl || null]
         );
 
         res.status(201).json({ success: true, data: formatMenuItem(result.rows[0]) });
@@ -114,7 +114,7 @@ router.post('/', authMiddleware, ownerMiddleware, async (req, res) => {
 // Update menu item
 router.put('/:id', authMiddleware, ownerMiddleware, async (req, res) => {
     try {
-        const { name, description, price, costPrice, categoryId, isAvailable, isVeg, isBestseller, spiceLevel, preparationTime } = req.body;
+        const { name, description, price, costPrice, categoryId, isAvailable, isVeg, isBestseller, spiceLevel, preparationTime, imageUrl } = req.body;
 
         // Verify ownership through restaurant
         const item = await query(
@@ -140,8 +140,9 @@ router.put('/:id', authMiddleware, ownerMiddleware, async (req, res) => {
             is_bestseller = $8,
             spice_level = $9,
             preparation_time = $10,
+            image_url = $11,
             updated_at = NOW()
-       WHERE id = $11
+       WHERE id = $12
        RETURNING *`,
             [
                 name,
@@ -154,6 +155,7 @@ router.put('/:id', authMiddleware, ownerMiddleware, async (req, res) => {
                 isBestseller || false,
                 spiceLevel || 0,
                 preparationTime || 15,
+                imageUrl || null,
                 req.params.id
             ]
         );

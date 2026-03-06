@@ -75,4 +75,19 @@ export const api = {
     processVoice: (body) => apiRequest('/ai/process-voice', { method: 'POST', body: JSON.stringify(body) }),
     getUpsell: (body) => apiRequest('/ai/upsell', { method: 'POST', body: JSON.stringify(body) }),
     getGreeting: (language) => apiRequest(`/ai/greeting?language=${language || 'en'}`),
+
+    // Upload
+    uploadImage: async (file) => {
+        const token = getToken();
+        const formData = new FormData();
+        formData.append('image', file);
+        const response = await fetch(`${API_BASE}/upload/image`, {
+            method: 'POST',
+            headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+            body: formData,
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error?.message || 'Upload failed');
+        return data;
+    },
 };
