@@ -3,30 +3,52 @@ import { useNavigate } from 'react-router-dom';
 import OwnerLayout from '../../components/layout/OwnerLayout';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { HiOutlineCurrencyRupee, HiOutlineShoppingBag, HiOutlineClipboardList, HiOutlineTrendingUp, HiOutlineStar, HiOutlineExclamationCircle } from 'react-icons/hi';
+import {
+    HiOutlineCurrencyRupee, HiOutlineShoppingBag, HiOutlineTrendingUp,
+    HiOutlineTrendingDown, HiOutlineChartBar, HiOutlineRefresh,
+} from 'react-icons/hi';
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
 
-const classificationEmojis = { star: '⭐', workhorse: '🐎', puzzle: '❓', dog: '🐶' };
-const classificationLabels = { star: 'Stars', workhorse: 'Workhorses', puzzle: 'Puzzles', dog: 'Dogs' };
+// ── Colors for chart bars (up to 8 items) ──
+const CHART_COLORS = [
+    '#f97316', '#8b5cf6', '#22c55e', '#3b82f6',
+    '#ef4444', '#eab308', '#06b6d4', '#ec4899',
+];
+
+// ── Helpers ──
+function formatDate(d) {
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function buildChartData(trends) {
+    // trends = [{ name, date, qty }]
+    const dateMap = {};
+    const items = new Set();
+    for (const t of trends) {
+        const key = t.date;
+        if (!dateMap[key]) dateMap[key] = { date: formatDate(key) };
+        dateMap[key][t.name] = (dateMap[key][t.name] || 0) + t.qty;
+        items.add(t.name);
+    }
+    return { data: Object.values(dateMap), items: [...items] };
+}
 
 export default function Dashboard() {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [restaurant, setRestaurant] = useState(null);
+    const [refreshing, setRefreshing] = useState(false);
 
-    useEffect(() => {
-        loadDashboard();
-    }, []);
+    useEffect(() => { loadDashboard(); }, []);
 
     const loadDashboard = async () => {
         try {
             const res = await api.getMyRestaurant();
-            if (!res.data) {
-                navigate('/owner/setup');
-                return;
-            }
-            setRestaurant(res.data);
+            if (!res.data) return navigate('/owner/setup');
             const dashRes = await api.getDashboard(res.data.id);
             setData(dashRes.data);
         } catch (err) {
@@ -36,216 +58,304 @@ export default function Dashboard() {
         }
     };
 
-    // Derive quick-insight counts from data
-    const hiddenStarCount = data?.classifications?.puzzle || 0;
-    const riskCount = data?.classifications?.dog || 0;
-    const starCount = data?.classifications?.star || 0;
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        setLoading(true);
+        await loadDashboard();
+        setRefreshing(false);
+    };
 
     if (loading) {
         return (
             <OwnerLayout>
                 <div className="page-container">
-                    <div className="stats-grid">
-                        {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="skeleton" style={{ height: 120, borderRadius: 'var(--radius-lg)' }} />
-                        ))}
+                    <div className="dash-kpi-row">
+                        {[1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 130, borderRadius: 'var(--radius-lg)' }} />)}
                     </div>
-                    <div className="grid-2">
-                        <div className="skeleton" style={{ height: 300, borderRadius: 'var(--radius-lg)' }} />
-                        <div className="skeleton" style={{ height: 300, borderRadius: 'var(--radius-lg)' }} />
+                    <div className="grid-2" style={{ marginTop: 20 }}>
+                        <div className="skeleton" style={{ height: 320, borderRadius: 'var(--radius-lg)' }} />
+                        <div className="skeleton" style={{ height: 320, borderRadius: 'var(--radius-lg)' }} />
                     </div>
                 </div>
             </OwnerLayout>
         );
     }
 
+    // Chart data
+    const weeklyChart = buildChartData(data?.weeklyItemTrends || []);
+    const monthlyChart = buildChartData(data?.monthlyItemTrends || []);
+
+    const wa = data?.weeklyAnalysis || {};
+    const ma = data?.monthlyAnalysis || {};
+
     return (
         <OwnerLayout>
             <div className="page-container">
-                {/* Welcome Banner */}
-                <div className="dashboard-welcome animate-fade-in-up">
-                    <h2>Welcome back, {user?.fullName?.split(' ')[0]}! 👋</h2>
-                    <p>Here's the intelligence overview for {data?.restaurant?.name || 'your restaurant'}.</p>
+
+                {/* Welcome Header */}
+                <div className="page-header animate-fade-in-up" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                        <h1>Welcome back, {user?.fullName?.split(' ')[0]}! 👋</h1>
+                        <p>Here's today's performance for {data?.restaurant?.name || 'your restaurant'}</p>
+                    </div>
+                    <button className="btn btn-secondary" onClick={handleRefresh} disabled={refreshing}>
+                        <HiOutlineRefresh size={16} className={refreshing ? 'animate-spin' : ''} />
+                        {refreshing ? 'Refreshing...' : 'Refresh'}
+                    </button>
                 </div>
 
-                {/* Stats Grid */}
-                <div className="stats-grid stagger-children">
-                    <div className="stat-card animate-fade-in-up">
-                        <div className="stat-icon brand"><HiOutlineCurrencyRupee /></div>
-                        <div>
-                            <div className="stat-value">₹{(data?.restaurant?.totalRevenue || 0).toLocaleString()}</div>
-                            <div className="stat-label">Total Revenue</div>
-                            <div className="stat-trend up">
-                                <HiOutlineTrendingUp size={14} /> This month: ₹{(data?.thisMonth?.revenue || 0).toLocaleString()}
-                            </div>
+                {/* ═══════════ TOP KPI CARDS ═══════════ */}
+                <div className="dash-kpi-row stagger-children animate-fade-in-up">
+
+                    {/* Today's Orders */}
+                    <div className="dash-kpi-card">
+                        <div className="dash-kpi-icon" style={{ background: 'var(--accent-50)', color: 'var(--accent-600)' }}>
+                            <HiOutlineShoppingBag size={22} />
+                        </div>
+                        <div className="dash-kpi-value">{data?.today?.orders || 0}</div>
+                        <div className="dash-kpi-label">Orders Today</div>
+                        <div className="dash-kpi-sub">
+                            This week: {data?.thisWeek?.orders || 0} &nbsp;·&nbsp; This month: {data?.thisMonth?.orders || 0}
                         </div>
                     </div>
 
-                    <div className="stat-card animate-fade-in-up">
-                        <div className="stat-icon accent"><HiOutlineShoppingBag /></div>
-                        <div>
-                            <div className="stat-value">{data?.restaurant?.totalOrders || 0}</div>
-                            <div className="stat-label">Total Orders</div>
-                            <div className="stat-trend up">
-                                Today: {data?.today?.orders || 0}
-                            </div>
+                    {/* Today's Revenue */}
+                    <div className="dash-kpi-card">
+                        <div className="dash-kpi-icon" style={{ background: 'var(--brand-50)', color: 'var(--brand-600)' }}>
+                            <HiOutlineCurrencyRupee size={22} />
+                        </div>
+                        <div className="dash-kpi-value">₹{(data?.today?.revenue || 0).toLocaleString()}</div>
+                        <div className="dash-kpi-label">Revenue Today</div>
+                        <div className="dash-kpi-sub">
+                            This week: ₹{(data?.thisWeek?.revenue || 0).toLocaleString()} &nbsp;·&nbsp; Month: ₹{(data?.thisMonth?.revenue || 0).toLocaleString()}
                         </div>
                     </div>
 
-                    <div className="stat-card animate-fade-in-up">
-                        <div className="stat-icon success"><HiOutlineClipboardList /></div>
-                        <div>
-                            <div className="stat-value">{data?.menuItemCount || 0}</div>
-                            <div className="stat-label">Menu Items</div>
-                            <div className="stat-trend up">
-                                <HiOutlineStar size={14} /> {starCount} Stars
-                            </div>
+                    {/* Today's Profit */}
+                    <div className="dash-kpi-card">
+                        <div className="dash-kpi-icon" style={{ background: 'var(--success-50)', color: 'var(--success-600)' }}>
+                            <HiOutlineTrendingUp size={22} />
+                        </div>
+                        <div className="dash-kpi-value" style={{ color: 'var(--success-600)' }}>₹{(data?.today?.profit || 0).toLocaleString()}</div>
+                        <div className="dash-kpi-label">Profit Today</div>
+                        <div className="dash-kpi-sub">
+                            This week: ₹{(data?.thisWeek?.profit || 0).toLocaleString()} &nbsp;·&nbsp; Month: ₹{(data?.thisMonth?.profit || 0).toLocaleString()}
                         </div>
                     </div>
 
-                    <div className="stat-card animate-fade-in-up">
-                        <div className="stat-icon warning"><HiOutlineExclamationCircle /></div>
-                        <div>
-                            <div className="stat-value">{hiddenStarCount}</div>
-                            <div className="stat-label">Hidden Stars</div>
-                            <div className="stat-trend up">
-                                {riskCount} Risk Items
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
-                <div className="grid-2">
-                    {/* Top Selling Items */}
-                    <div className="card animate-fade-in-up">
+                {/* ═══════════ TREND CHARTS ═══════════ */}
+                <div className="grid-2 animate-fade-in-up" style={{ marginTop: 24 }}>
+
+                    {/* Weekly Trend Chart */}
+                    <div className="card">
                         <div className="card-header">
                             <div>
-                                <div className="card-title">Top Selling Items</div>
-                                <div className="card-subtitle">Based on total sales volume</div>
+                                <div className="card-title"><HiOutlineChartBar size={16} style={{ marginRight: 6 }} /> Weekly Item Trend</div>
+                                <div className="card-subtitle">Units sold per item — last 7 days</div>
                             </div>
                         </div>
-                        {data?.topItems?.length > 0 ? (
-                            data.topItems.map((item, idx) => (
-                                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: idx < data.topItems.length - 1 ? '1px solid var(--neutral-100)' : 'none' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                        <span style={{ width: 28, height: 28, borderRadius: 'var(--radius-full)', background: 'var(--brand-50)', color: 'var(--brand-600)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>{idx + 1}</span>
-                                        <div>
-                                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--neutral-800)' }}>{item.name}</div>
-                                            <div style={{ fontSize: 12, color: 'var(--neutral-500)' }}>{item.totalSales} sold</div>
-                                        </div>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--brand-600)' }}>₹{item.totalRevenue?.toLocaleString()}</span>
-                                        {item.classification !== 'unclassified' && (
-                                            <span className={`badge badge-${item.classification}`}>
-                                                {classificationEmojis[item.classification]} {classificationLabels[item.classification]}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            ))
+                        {weeklyChart.data.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={280}>
+                                <BarChart data={weeklyChart.data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#888' }} />
+                                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#888' }} />
+                                    <Tooltip contentStyle={{ borderRadius: 10, fontSize: 12, border: '1px solid #eee' }} />
+                                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                                    {weeklyChart.items.map((name, i) => (
+                                        <Bar key={name} dataKey={name} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} />
+                                    ))}
+                                </BarChart>
+                            </ResponsiveContainer>
                         ) : (
-                            <div className="empty-state" style={{ padding: 32 }}>
+                            <div className="empty-state" style={{ padding: 40 }}>
                                 <div className="empty-state-icon">📊</div>
-                                <p>No sales data yet. Add menu items and POS data to see insights.</p>
+                                <p>No weekly sales data yet. Orders will appear here.</p>
                             </div>
                         )}
                     </div>
 
-                    {/* High Margin Items */}
-                    <div className="card animate-fade-in-up">
+                    {/* Monthly Trend Chart */}
+                    <div className="card">
                         <div className="card-header">
                             <div>
-                                <div className="card-title">High Margin Items</div>
-                                <div className="card-subtitle">Most profitable menu items</div>
+                                <div className="card-title"><HiOutlineChartBar size={16} style={{ marginRight: 6 }} /> Monthly Item Trend</div>
+                                <div className="card-subtitle">Units sold per item — last 30 days</div>
                             </div>
                         </div>
-                        {data?.topItems?.length > 0 ? (
-                            [...data.topItems]
-                                .sort((a, b) => (b.totalRevenue / (b.totalSales || 1)) - (a.totalRevenue / (a.totalSales || 1)))
-                                .map((item, idx) => (
-                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: idx < data.topItems.length - 1 ? '1px solid var(--neutral-100)' : 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                            <span style={{ width: 28, height: 28, borderRadius: 'var(--radius-full)', background: 'var(--success-50)', color: 'var(--success-600)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>{idx + 1}</span>
-                                            <div>
-                                                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--neutral-800)' }}>{item.name}</div>
-                                                <div style={{ fontSize: 12, color: 'var(--neutral-500)' }}>Revenue: ₹{item.totalRevenue?.toLocaleString()}</div>
-                                            </div>
-                                        </div>
-                                        {item.classification !== 'unclassified' && (
-                                            <span className={`badge badge-${item.classification}`}>
-                                                {classificationEmojis[item.classification]}
-                                            </span>
-                                        )}
-                                    </div>
-                                ))
+                        {monthlyChart.data.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={280}>
+                                <BarChart data={monthlyChart.data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#888' }} />
+                                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#888' }} />
+                                    <Tooltip contentStyle={{ borderRadius: 10, fontSize: 12, border: '1px solid #eee' }} />
+                                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                                    {monthlyChart.items.map((name, i) => (
+                                        <Bar key={name} dataKey={name} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} />
+                                    ))}
+                                </BarChart>
+                            </ResponsiveContainer>
                         ) : (
-                            <div className="empty-state" style={{ padding: 32 }}>
-                                <div className="empty-state-icon">💰</div>
-                                <p>No margin data yet.</p>
+                            <div className="empty-state" style={{ padding: 40 }}>
+                                <div className="empty-state-icon">📈</div>
+                                <p>No monthly sales data yet.</p>
                             </div>
                         )}
                     </div>
+
                 </div>
 
-                {/* Classification Overview */}
-                {data?.classifications && Object.keys(data.classifications).length > 0 && (
-                    <div className="card mt-6 animate-fade-in-up">
+                {/* ═══════════ WEEKLY & MONTHLY ANALYSIS ═══════════ */}
+                <div className="grid-2 animate-fade-in-up" style={{ marginTop: 24 }}>
+
+                    {/* Weekly Analysis */}
+                    <div className="card">
                         <div className="card-header">
                             <div>
-                                <div className="card-title">Menu Classification Overview</div>
-                                <div className="card-subtitle">BCG Matrix — Sales vs Profitability</div>
+                                <div className="card-title">📅 Weekly Analysis</div>
+                                <div className="card-subtitle">Key insights from the past 7 days</div>
                             </div>
                         </div>
-                        <div className="classification-grid">
-                            {Object.entries(classificationLabels).map(([key, label]) => (
-                                <div key={key} className={`classification-card ${key}`}>
-                                    <h3>
-                                        {classificationEmojis[key]} {label}
-                                        <span className={`badge badge-${key}`}>{data.classifications[key] || 0}</span>
-                                    </h3>
-                                    <p style={{ fontSize: 12, color: 'var(--neutral-600)' }}>
-                                        {key === 'star' && 'High sales + High margin — Your best performers'}
-                                        {key === 'workhorse' && 'High sales + Low margin — Popular but less profitable'}
-                                        {key === 'puzzle' && 'Low sales + High margin — Hidden potential'}
-                                        {key === 'dog' && 'Low sales + Low margin — Consider removing or repricing'}
-                                    </p>
+                        <div className="dash-analysis-body">
+                            {/* Summary Row */}
+                            <div className="dash-analysis-summary">
+                                <div>
+                                    <div className="dash-analysis-num">{data?.thisWeek?.orders || 0}</div>
+                                    <div className="dash-analysis-numlabel">Orders</div>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                                <div>
+                                    <div className="dash-analysis-num">₹{(data?.thisWeek?.revenue || 0).toLocaleString()}</div>
+                                    <div className="dash-analysis-numlabel">Revenue</div>
+                                </div>
+                                <div>
+                                    <div className="dash-analysis-num" style={{ color: 'var(--success-600)' }}>₹{(data?.thisWeek?.profit || 0).toLocaleString()}</div>
+                                    <div className="dash-analysis-numlabel">Profit</div>
+                                </div>
+                            </div>
 
-                {/* Revenue Summary */}
-                <div className="card mt-6 animate-fade-in-up">
-                    <div className="card-header">
-                        <div>
-                            <div className="card-title">Revenue Summary</div>
+                            {/* Top Items */}
+                            {wa.topItems?.length > 0 && (
+                                <div className="dash-analysis-section">
+                                    <div className="dash-analysis-heading">🏆 Most Ordered</div>
+                                    {wa.topItems.slice(0, 3).map((item, i) => (
+                                        <div key={i} className="dash-analysis-item">
+                                            <span className="dash-rank">{i + 1}</span>
+                                            <span>{item.name}</span>
+                                            <span className="dash-qty">{item.qty} sold</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Trending */}
+                            {wa.increasing?.length > 0 && (
+                                <div className="dash-analysis-section">
+                                    <div className="dash-analysis-heading" style={{ color: 'var(--success-600)' }}><HiOutlineTrendingUp size={14} /> Demand Increasing</div>
+                                    {wa.increasing.slice(0, 3).map((name, i) => (
+                                        <div key={i} className="dash-analysis-tag up">{name}</div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {wa.decreasing?.length > 0 && (
+                                <div className="dash-analysis-section">
+                                    <div className="dash-analysis-heading" style={{ color: 'var(--error-500)' }}><HiOutlineTrendingDown size={14} /> Demand Decreasing</div>
+                                    {wa.decreasing.slice(0, 3).map((name, i) => (
+                                        <div key={i} className="dash-analysis-tag down">{name}</div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {(!wa.topItems?.length && !wa.increasing?.length) && (
+                                <div className="rec-empty">Not enough weekly data yet</div>
+                            )}
                         </div>
                     </div>
-                    <div className="stats-grid" style={{ marginBottom: 0 }}>
-                        <div style={{ padding: '16px 0', textAlign: 'center' }}>
-                            <div style={{ fontSize: 12, color: 'var(--neutral-500)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>Today</div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--neutral-900)', fontFamily: 'var(--font-display)' }}>₹{(data?.today?.revenue || 0).toLocaleString()}</div>
-                            <div style={{ fontSize: 13, color: 'var(--neutral-500)' }}>{data?.today?.orders || 0} orders</div>
+
+                    {/* Monthly Analysis */}
+                    <div className="card">
+                        <div className="card-header">
+                            <div>
+                                <div className="card-title">📊 Monthly Analysis</div>
+                                <div className="card-subtitle">Performance overview — past 30 days</div>
+                            </div>
                         </div>
-                        <div style={{ padding: '16px 0', textAlign: 'center' }}>
-                            <div style={{ fontSize: 12, color: 'var(--neutral-500)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>This Week</div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--neutral-900)', fontFamily: 'var(--font-display)' }}>₹{(data?.thisWeek?.revenue || 0).toLocaleString()}</div>
-                            <div style={{ fontSize: 13, color: 'var(--neutral-500)' }}>{data?.thisWeek?.orders || 0} orders</div>
+                        <div className="dash-analysis-body">
+                            <div className="dash-analysis-summary">
+                                <div>
+                                    <div className="dash-analysis-num">{data?.thisMonth?.orders || 0}</div>
+                                    <div className="dash-analysis-numlabel">Orders</div>
+                                </div>
+                                <div>
+                                    <div className="dash-analysis-num">₹{(data?.thisMonth?.revenue || 0).toLocaleString()}</div>
+                                    <div className="dash-analysis-numlabel">Revenue</div>
+                                </div>
+                                <div>
+                                    <div className="dash-analysis-num" style={{ color: 'var(--success-600)' }}>₹{(data?.thisMonth?.profit || 0).toLocaleString()}</div>
+                                    <div className="dash-analysis-numlabel">Profit</div>
+                                </div>
+                            </div>
+
+                            {ma.topItems?.length > 0 && (
+                                <div className="dash-analysis-section">
+                                    <div className="dash-analysis-heading">🏆 Top Performing</div>
+                                    {ma.topItems.slice(0, 3).map((item, i) => (
+                                        <div key={i} className="dash-analysis-item">
+                                            <span className="dash-rank">{i + 1}</span>
+                                            <span>{item.name}</span>
+                                            <span className="dash-qty">{item.qty} sold</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {ma.increasing?.length > 0 && (
+                                <div className="dash-analysis-section">
+                                    <div className="dash-analysis-heading" style={{ color: 'var(--success-600)' }}><HiOutlineTrendingUp size={14} /> Growing Items</div>
+                                    {ma.increasing.slice(0, 3).map((name, i) => (
+                                        <div key={i} className="dash-analysis-tag up">{name}</div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {ma.decreasing?.length > 0 && (
+                                <div className="dash-analysis-section">
+                                    <div className="dash-analysis-heading" style={{ color: 'var(--error-500)' }}><HiOutlineTrendingDown size={14} /> Declining Items</div>
+                                    {ma.decreasing.slice(0, 3).map((name, i) => (
+                                        <div key={i} className="dash-analysis-tag down">{name}</div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {(!ma.topItems?.length && !ma.increasing?.length) && (
+                                <div className="rec-empty">Not enough monthly data yet</div>
+                            )}
                         </div>
-                        <div style={{ padding: '16px 0', textAlign: 'center' }}>
-                            <div style={{ fontSize: 12, color: 'var(--neutral-500)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>This Month</div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--neutral-900)', fontFamily: 'var(--font-display)' }}>₹{(data?.thisMonth?.revenue || 0).toLocaleString()}</div>
-                            <div style={{ fontSize: 13, color: 'var(--neutral-500)' }}>{data?.thisMonth?.orders || 0} orders</div>
+                    </div>
+
+                </div>
+
+                {/* ═══════════ ALL-TIME REVENUE FOOTER ═══════════ */}
+                <div className="card mt-6 animate-fade-in-up">
+                    <div className="dash-alltime-footer">
+                        <div>
+                            <div className="dash-alltime-label">Total Lifetime Revenue</div>
+                            <div className="dash-alltime-value">₹{(data?.restaurant?.totalRevenue || 0).toLocaleString()}</div>
                         </div>
-                        <div style={{ padding: '16px 0', textAlign: 'center' }}>
-                            <div style={{ fontSize: 12, color: 'var(--neutral-500)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>All Time</div>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--brand-600)', fontFamily: 'var(--font-display)' }}>₹{(data?.restaurant?.totalRevenue || 0).toLocaleString()}</div>
-                            <div style={{ fontSize: 13, color: 'var(--neutral-500)' }}>{data?.restaurant?.totalOrders || 0} orders</div>
+                        <div>
+                            <div className="dash-alltime-label">Total Lifetime Orders</div>
+                            <div className="dash-alltime-value">{data?.restaurant?.totalOrders || 0}</div>
+                        </div>
+                        <div>
+                            <div className="dash-alltime-label">Menu Items</div>
+                            <div className="dash-alltime-value">{data?.menuItemCount || 0}</div>
                         </div>
                     </div>
                 </div>
+
             </div>
         </OwnerLayout>
     );

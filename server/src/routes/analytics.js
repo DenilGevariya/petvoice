@@ -16,75 +16,147 @@ router.get('/dashboard/:restaurantId', authMiddleware, ownerMiddleware, async (r
             return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Not your restaurant' } });
         }
 
-        // Get restaurant stats
         const restaurant = await query('SELECT * FROM restaurants WHERE id = $1', [restaurantId]);
 
-        // Today's stats
+        // ── Today's stats (orders, revenue, profit) ──
         const todayOrders = await query(
-            `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue 
-       FROM orders WHERE restaurant_id = $1 AND DATE(created_at) = CURRENT_DATE`,
+            `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
+             FROM orders WHERE restaurant_id = $1 AND DATE(created_at) = CURRENT_DATE`,
             [restaurantId]
         );
 
-        // This week's stats
+        const todayProfit = await query(
+            `SELECT COALESCE(SUM(oi.quantity * (oi.unit_price - mi.cost_price)), 0) as profit
+             FROM order_items oi
+             JOIN orders o ON oi.order_id = o.id
+             JOIN menu_items mi ON oi.menu_item_id = mi.id
+             WHERE o.restaurant_id = $1 AND DATE(o.created_at) = CURRENT_DATE`,
+            [restaurantId]
+        );
+
+        // ── This week's stats ──
         const weekOrders = await query(
-            `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue 
-       FROM orders WHERE restaurant_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '7 days'`,
+            `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
+             FROM orders WHERE restaurant_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '7 days'`,
             [restaurantId]
         );
 
-        // This month's stats
+        const weekProfit = await query(
+            `SELECT COALESCE(SUM(oi.quantity * (oi.unit_price - mi.cost_price)), 0) as profit
+             FROM order_items oi
+             JOIN orders o ON oi.order_id = o.id
+             JOIN menu_items mi ON oi.menu_item_id = mi.id
+             WHERE o.restaurant_id = $1 AND o.created_at >= CURRENT_DATE - INTERVAL '7 days'`,
+            [restaurantId]
+        );
+
+        // ── This month's stats ──
         const monthOrders = await query(
-            `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue 
-       FROM orders WHERE restaurant_id = $1 AND created_at >= DATE_TRUNC('month', CURRENT_DATE)`,
+            `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
+             FROM orders WHERE restaurant_id = $1 AND created_at >= DATE_TRUNC('month', CURRENT_DATE)`,
             [restaurantId]
         );
 
-        // Top selling items
-        const topItems = await query(
-            `SELECT name, total_sales, total_revenue, classification 
-       FROM menu_items WHERE restaurant_id = $1 
-       ORDER BY total_sales DESC LIMIT 5`,
+        const monthProfit = await query(
+            `SELECT COALESCE(SUM(oi.quantity * (oi.unit_price - mi.cost_price)), 0) as profit
+             FROM order_items oi
+             JOIN orders o ON oi.order_id = o.id
+             JOIN menu_items mi ON oi.menu_item_id = mi.id
+             WHERE o.restaurant_id = $1 AND o.created_at >= DATE_TRUNC('month', CURRENT_DATE)`,
             [restaurantId]
         );
 
-        // Recent orders
-        const recentOrders = await query(
-            `SELECT o.order_number, o.total, o.status, o.created_at, u.full_name as customer_name
-       FROM orders o JOIN users u ON o.user_id = u.id
-       WHERE o.restaurant_id = $1 
-       ORDER BY o.created_at DESC LIMIT 5`,
+        // ── Weekly item trends (last 7 days, per item per day) ──
+        const weeklyItemTrends = await query(
+            `SELECT mi.name, DATE(o.created_at) as sale_date, SUM(oi.quantity) as qty
+             FROM order_items oi
+             JOIN orders o ON oi.order_id = o.id
+             JOIN menu_items mi ON oi.menu_item_id = mi.id
+             WHERE o.restaurant_id = $1 AND o.created_at >= CURRENT_DATE - INTERVAL '7 days'
+             GROUP BY mi.name, DATE(o.created_at)
+             ORDER BY sale_date`,
             [restaurantId]
         );
 
-        // Classification distribution
-        const classifications = await query(
-            `SELECT classification, COUNT(*) as count 
-       FROM menu_items WHERE restaurant_id = $1 AND classification != 'unclassified'
-       GROUP BY classification`,
+        // ── Monthly item trends (last 30 days, per item per day) ──
+        const monthlyItemTrends = await query(
+            `SELECT mi.name, DATE(o.created_at) as sale_date, SUM(oi.quantity) as qty
+             FROM order_items oi
+             JOIN orders o ON oi.order_id = o.id
+             JOIN menu_items mi ON oi.menu_item_id = mi.id
+             WHERE o.restaurant_id = $1 AND o.created_at >= CURRENT_DATE - INTERVAL '30 days'
+             GROUP BY mi.name, DATE(o.created_at)
+             ORDER BY sale_date`,
+            [restaurantId]
+        );
+
+        // ── Weekly analysis: top item, total qty, items trending up/down ──
+        const weeklyTopItems = await query(
+            `SELECT mi.name, SUM(oi.quantity) as total_qty
+             FROM order_items oi
+             JOIN orders o ON oi.order_id = o.id
+             JOIN menu_items mi ON oi.menu_item_id = mi.id
+             WHERE o.restaurant_id = $1 AND o.created_at >= CURRENT_DATE - INTERVAL '7 days'
+             GROUP BY mi.name
+             ORDER BY total_qty DESC LIMIT 5`,
+            [restaurantId]
+        );
+
+        // For weekly trend (first-half vs second-half of 7 days)
+        const weeklyHalfTrends = await query(
+            `SELECT mi.name,
+                SUM(CASE WHEN o.created_at < CURRENT_DATE - INTERVAL '3 days' THEN oi.quantity ELSE 0 END) as first_half,
+                SUM(CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '3 days' THEN oi.quantity ELSE 0 END) as second_half
+             FROM order_items oi
+             JOIN orders o ON oi.order_id = o.id
+             JOIN menu_items mi ON oi.menu_item_id = mi.id
+             WHERE o.restaurant_id = $1 AND o.created_at >= CURRENT_DATE - INTERVAL '7 days'
+             GROUP BY mi.name`,
+            [restaurantId]
+        );
+
+        // ── Monthly analysis: top item, items trending up/down ──
+        const monthlyTopItems = await query(
+            `SELECT mi.name, SUM(oi.quantity) as total_qty
+             FROM order_items oi
+             JOIN orders o ON oi.order_id = o.id
+             JOIN menu_items mi ON oi.menu_item_id = mi.id
+             WHERE o.restaurant_id = $1 AND o.created_at >= CURRENT_DATE - INTERVAL '30 days'
+             GROUP BY mi.name
+             ORDER BY total_qty DESC LIMIT 5`,
+            [restaurantId]
+        );
+
+        const monthlyHalfTrends = await query(
+            `SELECT mi.name,
+                SUM(CASE WHEN o.created_at < CURRENT_DATE - INTERVAL '15 days' THEN oi.quantity ELSE 0 END) as first_half,
+                SUM(CASE WHEN o.created_at >= CURRENT_DATE - INTERVAL '15 days' THEN oi.quantity ELSE 0 END) as second_half
+             FROM order_items oi
+             JOIN orders o ON oi.order_id = o.id
+             JOIN menu_items mi ON oi.menu_item_id = mi.id
+             WHERE o.restaurant_id = $1 AND o.created_at >= CURRENT_DATE - INTERVAL '30 days'
+             GROUP BY mi.name`,
             [restaurantId]
         );
 
         // Total menu items
-        const menuCount = await query(
-            'SELECT COUNT(*) as count FROM menu_items WHERE restaurant_id = $1',
-            [restaurantId]
-        );
+        const menuCount = await query('SELECT COUNT(*) as count FROM menu_items WHERE restaurant_id = $1', [restaurantId]);
 
-        // AI voice orders count
-        const voiceOrders = await query(
-            `SELECT COUNT(*) as count FROM orders WHERE restaurant_id = $1 AND ordered_via = 'voice'`,
-            [restaurantId]
-        );
+        // Build trend helpers
+        const buildTrendDirection = (rows) => {
+            const increasing = [];
+            const decreasing = [];
+            for (const r of rows) {
+                const f = parseInt(r.first_half) || 0;
+                const s = parseInt(r.second_half) || 0;
+                if (s > f) increasing.push(r.name);
+                else if (s < f) decreasing.push(r.name);
+            }
+            return { increasing, decreasing };
+        };
 
-        // Upsell acceptance rate
-        const upsellStats = await query(
-            `SELECT 
-        COUNT(*) FILTER (WHERE ai_upsell_accepted = true) as accepted,
-        COUNT(*) as total
-       FROM orders WHERE restaurant_id = $1 AND ordered_via = 'voice'`,
-            [restaurantId]
-        );
+        const weekTrends = buildTrendDirection(weeklyHalfTrends.rows);
+        const monthTrends = buildTrendDirection(monthlyHalfTrends.rows);
 
         const r = restaurant.rows[0];
         res.json({
@@ -98,38 +170,30 @@ router.get('/dashboard/:restaurantId', authMiddleware, ownerMiddleware, async (r
                 },
                 today: {
                     orders: parseInt(todayOrders.rows[0].count),
-                    revenue: parseFloat(todayOrders.rows[0].revenue)
+                    revenue: parseFloat(todayOrders.rows[0].revenue),
+                    profit: parseFloat(todayProfit.rows[0].profit)
                 },
                 thisWeek: {
                     orders: parseInt(weekOrders.rows[0].count),
-                    revenue: parseFloat(weekOrders.rows[0].revenue)
+                    revenue: parseFloat(weekOrders.rows[0].revenue),
+                    profit: parseFloat(weekProfit.rows[0].profit)
                 },
                 thisMonth: {
                     orders: parseInt(monthOrders.rows[0].count),
-                    revenue: parseFloat(monthOrders.rows[0].revenue)
+                    revenue: parseFloat(monthOrders.rows[0].revenue),
+                    profit: parseFloat(monthProfit.rows[0].profit)
                 },
-                topItems: topItems.rows.map(i => ({
-                    name: i.name,
-                    totalSales: i.total_sales,
-                    totalRevenue: parseFloat(i.total_revenue),
-                    classification: i.classification
-                })),
-                recentOrders: recentOrders.rows.map(o => ({
-                    orderNumber: o.order_number,
-                    total: parseFloat(o.total),
-                    status: o.status,
-                    customerName: o.customer_name,
-                    createdAt: o.created_at
-                })),
-                classifications: classifications.rows.reduce((acc, c) => {
-                    acc[c.classification] = parseInt(c.count);
-                    return acc;
-                }, {}),
                 menuItemCount: parseInt(menuCount.rows[0].count),
-                voiceOrderCount: parseInt(voiceOrders.rows[0].count),
-                upsellRate: upsellStats.rows[0].total > 0
-                    ? ((parseInt(upsellStats.rows[0].accepted) / parseInt(upsellStats.rows[0].total)) * 100).toFixed(1)
-                    : 0
+                weeklyItemTrends: weeklyItemTrends.rows.map(r => ({ name: r.name, date: r.sale_date, qty: parseInt(r.qty) })),
+                monthlyItemTrends: monthlyItemTrends.rows.map(r => ({ name: r.name, date: r.sale_date, qty: parseInt(r.qty) })),
+                weeklyAnalysis: {
+                    topItems: weeklyTopItems.rows.map(r => ({ name: r.name, qty: parseInt(r.total_qty) })),
+                    ...weekTrends
+                },
+                monthlyAnalysis: {
+                    topItems: monthlyTopItems.rows.map(r => ({ name: r.name, qty: parseInt(r.total_qty) })),
+                    ...monthTrends
+                },
             }
         });
     } catch (error) {
