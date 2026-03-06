@@ -14,11 +14,11 @@ const managementNav = [
 ];
 
 const intelligenceNav = [
+    { path: '/owner/recommendations', label: 'Recommendations', icon: HiOutlineLightBulb },
     { path: '/owner/contribution-margin', label: 'Contribution Margin', icon: HiOutlineChartBar },
     { path: '/owner/popularity-score', label: 'Popularity Score', icon: HiOutlineTrendingUp },
     { path: '/owner/hidden-stars', label: 'Hidden Stars', icon: HiOutlineStar },
     { path: '/owner/risk-detection', label: 'Risk Detection', icon: HiOutlineExclamationCircle },
-    { path: '/owner/recommendations', label: 'Recommendations', icon: HiOutlineLightBulb },
     { path: '/owner/combo-pricing', label: 'Combo & Pricing', icon: HiOutlineCurrencyDollar },
 ];
 

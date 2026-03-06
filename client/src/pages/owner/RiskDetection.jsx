@@ -11,9 +11,14 @@ function classifyMarginLevel(marginPct) {
 }
 
 function classifyRisk(marginPct, ordersPerDay) {
-    if (marginPct < 30 && ordersPerDay < 2) return { label: 'High Risk', color: 'var(--error-500)', bg: 'var(--error-50)', icon: '🔴' };
-    if (marginPct < 40 && ordersPerDay < 3) return { label: 'Medium Risk', color: 'var(--warning-600)', bg: 'var(--warning-50)', icon: '🟡' };
-    return { label: 'Low Risk', color: 'var(--success-600)', bg: 'var(--success-50)', icon: '🟢' };
+    const lowMargin = marginPct < 30;
+    const highMargin = marginPct >= 30;
+    const lowOrders = ordersPerDay < 2;
+    const highOrders = ordersPerDay >= 2;
+
+    if (lowMargin && lowOrders) return { label: 'High', color: 'var(--error-500)', bg: 'var(--error-50, #fef2f2)', icon: '🔴' };
+    if (highMargin && highOrders) return { label: 'Low', color: 'var(--success-600)', bg: 'var(--success-50)', icon: '🟢' };
+    return { label: 'Medium', color: 'var(--warning-600)', bg: 'var(--warning-50)', icon: '🟡' };
 }
 
 export default function RiskDetection() {
@@ -56,7 +61,7 @@ export default function RiskDetection() {
 
             // Sort: High Risk first
             riskData.sort((a, b) => {
-                const riskOrder = { 'High Risk': 0, 'Medium Risk': 1, 'Low Risk': 2 };
+                const riskOrder = { 'High': 0, 'Medium': 1, 'Low': 2 };
                 return (riskOrder[a.risk.label] || 2) - (riskOrder[b.risk.label] || 2);
             });
 
@@ -68,14 +73,14 @@ export default function RiskDetection() {
         }
     };
 
-    const highRiskCount = items.filter(i => i.risk.label === 'High Risk').length;
-    const medRiskCount = items.filter(i => i.risk.label === 'Medium Risk').length;
-    const lowRiskCount = items.filter(i => i.risk.label === 'Low Risk').length;
+    const highRiskCount = items.filter(i => i.risk.label === 'High').length;
+    const medRiskCount = items.filter(i => i.risk.label === 'Medium').length;
+    const lowRiskCount = items.filter(i => i.risk.label === 'Low').length;
 
     const filtered = filter === 'all' ? items : items.filter(i => {
-        if (filter === 'high') return i.risk.label === 'High Risk';
-        if (filter === 'medium') return i.risk.label === 'Medium Risk';
-        return i.risk.label === 'Low Risk';
+        if (filter === 'high') return i.risk.label === 'High';
+        if (filter === 'medium') return i.risk.label === 'Medium';
+        return i.risk.label === 'Low';
     });
 
     if (loading) {
@@ -151,7 +156,7 @@ export default function RiskDetection() {
                                         <th>Margin (₹)</th>
                                         <th>Margin Level</th>
                                         <th>Orders / Day</th>
-                                        <th>Risk</th>
+                                        <th>Risk Level</th>
                                     </tr>
                                 </thead>
                                 <tbody>
