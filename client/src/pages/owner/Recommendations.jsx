@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import OwnerLayout from '../../components/layout/OwnerLayout';
 import { api } from '../../lib/api';
-import { HiOutlineSparkles, HiOutlineLightBulb, HiOutlineRefresh } from 'react-icons/hi';
+import toast from 'react-hot-toast';
+import {
+    HiOutlineRefresh, HiOutlineLightBulb, HiOutlinePhotograph,
+    HiOutlineTrendingUp, HiOutlineTrash, HiOutlineSpeakerphone, HiOutlineTag,
+} from 'react-icons/hi';
 
 function classifyVelocity(ordersPerDay) {
     if (ordersPerDay >= 5) return 'Fast';
@@ -10,38 +14,24 @@ function classifyVelocity(ordersPerDay) {
     return 'Slow';
 }
 
-function getMarginLevel(marginPct) {
-    if (marginPct >= 50) return 'High';
-    if (marginPct >= 30) return 'Medium';
+function getMarginLevel(pct) {
+    if (pct >= 50) return 'High';
+    if (pct >= 30) return 'Medium';
     return 'Low';
-}
-
-function isWeekendApproaching() {
-    const day = new Date().getDay();
-    return day >= 4 || day === 0;
-}
-
-function getUpcomingFestival() {
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const date = now.getDate();
-    if (month === 1 && date >= 10 && date <= 20) return 'Makar Sankranti / Pongal';
-    if (month === 3 && date >= 15 && date <= 31) return 'Holi';
-    if (month === 4 && date >= 10 && date <= 18) return 'Baisakhi / Vishu';
-    if (month === 8 && date >= 15 && date <= 31) return 'Independence Day / Raksha Bandhan';
-    if (month === 9 && date >= 1 && date <= 15) return 'Ganesh Chaturthi';
-    if (month === 10 && date >= 1 && date <= 25) return 'Navratri / Dussehra';
-    if ((month === 10 && date >= 25) || (month === 11 && date <= 15)) return 'Diwali';
-    if (month === 12 && date >= 20 && date <= 31) return 'Christmas / New Year';
-    return null;
 }
 
 export default function Recommendations() {
     const navigate = useNavigate();
-    const [recommendations, setRecommendations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [summary, setSummary] = useState(null);
+    const [actionLoading, setActionLoading] = useState({});
+    const [restaurantId, setRestaurantId] = useState(null);
+
+    // The 4 recommendation buckets — max 2 items each
+    const [increasePrice, setIncreasePrice] = useState([]);
+    const [dropItems, setDropItems] = useState([]);
+    const [promoteItems, setPromoteItems] = useState([]);
+    const [discountItems, setDiscountItems] = useState([]);
 
     useEffect(() => { loadData(); }, []);
 
@@ -49,20 +39,26 @@ export default function Recommendations() {
         try {
             const res = await api.getMyRestaurant();
             if (!res.data) return navigate('/owner/setup');
-            const restaurantId = res.data.id;
+            const rid = res.data.id;
+            setRestaurantId(rid);
 
-            const [marginsRes, hiddenRes, trendsRes] = await Promise.all([
-                api.getMargins(restaurantId),
-                api.getHiddenStars(restaurantId),
-                api.getSalesTrends(restaurantId, 30),
+            const [marginsRes, menuRes, trendsRes] = await Promise.all([
+                api.getMargins(rid),
+                api.getMenuItems(rid),
+                api.getSalesTrends(rid, 30),
             ]);
 
             const margins = marginsRes.data || [];
+            const menuItems = menuRes.data || [];
             const dailyTrends = trendsRes.data?.dailyTrends || [];
             const itemHalfTrends = trendsRes.data?.itemHalfTrends || [];
             const numDays = Math.max(dailyTrends.length, 1);
 
-            // Enrich every item with velocity, margin level, trend
+            // Build a map of menu items by name for imageUrl lookup
+            const imageMap = {};
+            menuItems.forEach(mi => { imageMap[mi.name] = mi; });
+
+            // Enrich items
             const items = margins.map(item => {
                 const marginPct = parseFloat(item.marginPercentage);
                 const ordersPerDay = numDays > 0 ? item.totalSales / numDays : 0;
@@ -72,8 +68,11 @@ export default function Recommendations() {
                     if (halfTrend.secondHalf > halfTrend.firstHalf) trend = 'up';
                     else if (halfTrend.secondHalf < halfTrend.firstHalf) trend = 'down';
                 }
+                const menuItem = imageMap[item.name] || {};
                 return {
                     ...item,
+                    imageUrl: menuItem.imageUrl || null,
+                    menuItemId: menuItem.id || item.id,
                     marginPct,
                     ordersPerDay: parseFloat(ordersPerDay.toFixed(2)),
                     velocity: classifyVelocity(ordersPerDay),
@@ -82,144 +81,43 @@ export default function Recommendations() {
                 };
             });
 
-            const fastItems = items.filter(i => i.velocity === 'Fast' || i.velocity === 'Medium');
-            const slowItems = items.filter(i => i.velocity === 'Slow');
-            const highMarginItems = items.filter(i => i.marginLevel === 'High');
-            const lowMarginItems = items.filter(i => i.marginLevel === 'Low');
-
-            // ---- Build analytics recommendations ----
-            const analyticsRecs = [];
-
-            items.forEach(item => {
-                const isHigh = item.marginLevel === 'High';
-                const isLow = item.marginLevel === 'Low';
-                const isSlow = item.velocity === 'Slow';
-                const isFastMed = item.velocity === 'Fast' || item.velocity === 'Medium';
-                const isDeclining = item.trend === 'down';
-
-                // High risk: low margin + slow → remove or rework
-                if (isLow && isSlow) {
-                    analyticsRecs.push({
-                        priority: 0,
-                        icon: '🗑️',
-                        title: `Remove "${item.name}" from your menu`,
-                        description: `This item has low profit (₹${item.contributionMargin.toFixed(0)} margin) and very few orders (${item.ordersPerDay}/day). It's not contributing to your revenue. Consider removing it or replacing with something new.`,
-                    });
-                    return;
-                }
-
-                // Declining demand + moderate/low margin → take action
-                if (isDeclining && !isHigh) {
-                    analyticsRecs.push({
-                        priority: 1,
-                        icon: '📉',
-                        title: `"${item.name}" is losing customers`,
-                        description: `Orders for this item are going down. Try improving the recipe, changing the presentation, or running a limited-time discount to bring attention back.`,
-                    });
-                }
-
-                // Low margin + popular → bundle into combos
-                if (isLow && isFastMed) {
-                    analyticsRecs.push({
-                        priority: 2,
-                        icon: '📦',
-                        title: `Create a combo with "${item.name}"`,
-                        description: `This is a popular item but the profit is low (${item.marginPercentage}%). Add it to a combo with a higher-margin item to increase your overall earnings per order.`,
-                    });
-                }
-
-                // High margin + popular → increase price
-                if (isHigh && isFastMed) {
-                    analyticsRecs.push({
-                        priority: 3,
-                        icon: '💰',
-                        title: `Increase the price of "${item.name}"`,
-                        description: `Customers love this item and it already has great profit (${item.marginPercentage}%). A small price increase of ₹10–₹20 won't affect demand but will boost your revenue.`,
-                    });
-                }
-
-                // High margin + slow → promote it
-                if (isHigh && isSlow) {
-                    analyticsRecs.push({
-                        priority: 4,
-                        icon: '📣',
-                        title: `Promote "${item.name}" more`,
-                        description: `This item earns you good profit (₹${item.contributionMargin.toFixed(0)} per sale) but not many people are ordering it. Place it at the top of your menu, add a photo, or feature it on social media.`,
-                    });
-                }
-            });
-
-            // Slow items → pair with fast items
-            slowItems.forEach(slow => {
-                const pair = fastItems.find(f => f.name !== slow.name);
-                if (pair && !analyticsRecs.find(r => r.title.includes(slow.name) && r.title.includes('combo'))) {
-                    analyticsRecs.push({
-                        priority: 5,
-                        icon: '🔗',
-                        title: `Bundle "${slow.name}" with "${pair.name}"`,
-                        description: `"${slow.name}" doesn't sell much on its own. Pair it with your popular "${pair.name}" as a combo deal — this can increase your average order value.`,
-                    });
-                }
-            });
-
-            // Sort analytics recs by priority and take top 5
-            analyticsRecs.sort((a, b) => a.priority - b.priority);
-            const top5 = analyticsRecs.slice(0, 5);
-
-            // ---- Build event / promo recommendations (pick up to 3) ----
-            const eventRecs = [];
-
-            if (isWeekendApproaching()) {
-                eventRecs.push({
-                    icon: '🎉',
-                    title: 'Create weekend combo deals',
-                    description: 'The weekend is approaching — a great time to offer family packs, buy-one-get-one deals, or special combo offers to drive more orders.',
+            // 1. INCREASE PRICE — High demand items (Fast/Medium) with good margin
+            const priceUp = items
+                .filter(i => (i.velocity === 'Fast' || i.velocity === 'Medium') && i.marginLevel !== 'Low')
+                .sort((a, b) => b.ordersPerDay - a.ordersPerDay)
+                .slice(0, 2)
+                .map(item => {
+                    const bump = item.price <= 100 ? 10 : item.price <= 300 ? 20 : 30;
+                    return { ...item, suggestedPrice: Math.round(item.price + bump) };
                 });
 
-                if (fastItems.length >= 2) {
-                    eventRecs.push({
-                        icon: '🍕',
-                        title: `Weekend Special: "${fastItems[0].name}" + "${fastItems[1].name}"`,
-                        description: `Both items are customer favorites. Offer them together at a 10–15% discount this weekend to attract more orders.`,
-                    });
-                }
-            }
+            // 2. DROP ITEMS — Low margin + Slow + optionally declining
+            const drops = items
+                .filter(i => i.marginLevel === 'Low' && i.velocity === 'Slow')
+                .sort((a, b) => a.ordersPerDay - b.ordersPerDay)
+                .slice(0, 2);
 
-            const festival = getUpcomingFestival();
-            if (festival) {
-                eventRecs.push({
-                    icon: '🪔',
-                    title: `${festival} is coming — plan festive offers!`,
-                    description: `Create special festive combos, limited-time menu items, or themed packaging for ${festival}. Promote on social media to attract more customers.`,
+            // 3. PROMOTE — High margin but Slow (hidden gems)
+            const promos = items
+                .filter(i => i.marginLevel === 'High' && i.velocity === 'Slow')
+                .sort((a, b) => b.contributionMargin - a.contributionMargin)
+                .slice(0, 2);
+
+            // 4. DISCOUNT — Medium margin/velocity or declining, not in drops
+            const dropIds = new Set(drops.map(d => d.menuItemId));
+            const discounts = items
+                .filter(i => !dropIds.has(i.menuItemId) && (i.trend === 'down' || (i.marginLevel === 'Medium' && i.velocity === 'Slow')))
+                .sort((a, b) => a.ordersPerDay - b.ordersPerDay)
+                .slice(0, 2)
+                .map(item => {
+                    const discountPct = item.marginPct >= 40 ? 15 : 10;
+                    return { ...item, discountPct, discountedPrice: Math.round(item.price * (1 - discountPct / 100)) };
                 });
-            }
 
-            eventRecs.push({
-                icon: '📅',
-                title: 'Run weekly specials to build habits',
-                description: 'Schedule recurring promotions like "Taco Tuesday" or "Fry-day Deals". This builds repeat customer habits and creates predictable revenue bumps.',
-            });
-
-            eventRecs.push({
-                icon: '📱',
-                title: 'Share your best dishes on social media',
-                description: 'Post photos of your top-selling items on Instagram and WhatsApp Status. A good food photo can bring in new customers without spending on ads.',
-            });
-
-            const top3Events = eventRecs.slice(0, 3);
-
-            // ---- Merge into final list of 8 ----
-            const finalRecs = [...top5, ...top3Events];
-
-            setRecommendations(finalRecs);
-            setSummary({
-                totalItems: items.length,
-                totalRecs: finalRecs.length,
-                highMargin: highMarginItems.length,
-                lowMargin: lowMarginItems.length,
-                fast: fastItems.length,
-                slow: slowItems.length,
-            });
+            setIncreasePrice(priceUp);
+            setDropItems(drops);
+            setPromoteItems(promos);
+            setDiscountItems(discounts);
         } catch (err) {
             console.error(err);
         } finally {
@@ -234,12 +132,78 @@ export default function Recommendations() {
         setRefreshing(false);
     };
 
+    // ------- Actions -------
+
+    const handleIncreasePrice = async (item) => {
+        const key = `price-${item.menuItemId}`;
+        setActionLoading(prev => ({ ...prev, [key]: true }));
+        try {
+            await api.updateMenuItem(item.menuItemId, {
+                name: item.name,
+                price: item.suggestedPrice,
+                costPrice: item.costPrice,
+                isAvailable: true,
+                isVeg: item.isVeg ?? false,
+                isBestseller: item.isBestseller ?? false,
+                spiceLevel: item.spiceLevel ?? 0,
+                preparationTime: item.preparationTime ?? 15,
+                imageUrl: item.imageUrl,
+            });
+            toast.success(`"${item.name}" price updated to ₹${item.suggestedPrice}!`);
+            setIncreasePrice(prev => prev.filter(i => i.menuItemId !== item.menuItemId));
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setActionLoading(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
+    const handleDropItem = async (item) => {
+        if (!confirm(`Remove "${item.name}" from your menu?`)) return;
+        const key = `drop-${item.menuItemId}`;
+        setActionLoading(prev => ({ ...prev, [key]: true }));
+        try {
+            await api.updateMenuItem(item.menuItemId, {
+                name: item.name,
+                price: item.price,
+                costPrice: item.costPrice,
+                isAvailable: false,
+                isVeg: item.isVeg ?? false,
+                isBestseller: item.isBestseller ?? false,
+                spiceLevel: item.spiceLevel ?? 0,
+                preparationTime: item.preparationTime ?? 15,
+                imageUrl: item.imageUrl,
+            });
+            toast.success(`"${item.name}" removed from menu`);
+            setDropItems(prev => prev.filter(i => i.menuItemId !== item.menuItemId));
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setActionLoading(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
+    // ------- Render -------
+
+    const ItemImage = ({ src, name }) => (
+        <div className="rec-card-img">
+            {src ? (
+                <img src={src} alt={name} />
+            ) : (
+                <div className="rec-card-img-placeholder"><HiOutlinePhotograph size={24} /></div>
+            )}
+        </div>
+    );
+
+    const totalRecs = increasePrice.length + dropItems.length + promoteItems.length + discountItems.length;
+
     if (loading) {
         return (
             <OwnerLayout>
                 <div className="page-container">
-                    <div className="card mb-6 skeleton" style={{ height: 100, borderRadius: 'var(--radius-lg)' }} />
-                    {[1, 2, 3, 4].map(i => <div key={i} className="skeleton" style={{ height: 80, borderRadius: 'var(--radius-lg)', marginTop: 12 }} />)}
+                    <div className="rec-grid">
+                        {[1, 2, 3, 4].map(i => <div key={i} className="skeleton" style={{ height: 320, borderRadius: 'var(--radius-lg)' }} />)}
+                    </div>
                 </div>
             </OwnerLayout>
         );
@@ -252,7 +216,7 @@ export default function Recommendations() {
                 <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                         <h1>💡 Recommendations</h1>
-                        <p>Actionable suggestions to improve your menu, pricing, and revenue</p>
+                        <p>Smart suggestions to improve pricing, menu, and revenue</p>
                     </div>
                     <button className="btn btn-secondary" onClick={handleRefresh} disabled={refreshing}>
                         <HiOutlineRefresh size={16} className={refreshing ? 'animate-spin' : ''} />
@@ -260,69 +224,157 @@ export default function Recommendations() {
                     </button>
                 </div>
 
-                {/* Summary Banner */}
-                {summary && (
-                    <div className="card mb-6 animate-fade-in-up" style={{ background: 'linear-gradient(135deg, var(--brand-50), var(--accent-50))', border: 'none' }}>
-                        <div className="flex items-center gap-3 mb-4">
-                            <HiOutlineSparkles size={20} style={{ color: 'var(--accent-600)' }} />
-                            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--neutral-800)' }}>
-                                {summary.totalRecs} recommendations for your {summary.totalItems} menu items
-                            </h3>
-                        </div>
-                        <div className="stats-grid" style={{ marginBottom: 0 }}>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--neutral-900)' }}>{summary.totalItems}</div>
-                                <div style={{ fontSize: 12, color: 'var(--neutral-500)' }}>Menu Items</div>
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--success-600)' }}>{summary.highMargin}</div>
-                                <div style={{ fontSize: 12, color: 'var(--neutral-500)' }}>High Profit Items</div>
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--error-500)' }}>{summary.lowMargin}</div>
-                                <div style={{ fontSize: 12, color: 'var(--neutral-500)' }}>Low Profit Items</div>
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--warning-600)' }}>{summary.slow}</div>
-                                <div style={{ fontSize: 12, color: 'var(--neutral-500)' }}>Slow Sellers</div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Unified Recommendation List */}
-                {recommendations.length > 0 ? (
-                    <div className="card animate-fade-in-up">
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            {recommendations.map((rec, idx) => (
-                                <div
-                                    key={idx}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'flex-start',
-                                        gap: 16,
-                                        padding: '18px 4px',
-                                        borderBottom: idx < recommendations.length - 1 ? '1px solid var(--neutral-100)' : 'none',
-                                    }}
-                                >
-                                    <span style={{ fontSize: 24, flexShrink: 0, marginTop: 2 }}>{rec.icon}</span>
-                                    <div style={{ flex: 1 }}>
-                                        <h4 style={{ fontSize: 15, fontWeight: 700, color: 'var(--neutral-800)', marginBottom: 4, lineHeight: 1.4 }}>
-                                            {rec.title}
-                                        </h4>
-                                        <p style={{ fontSize: 13, color: 'var(--neutral-600)', lineHeight: 1.7, margin: 0 }}>
-                                            {rec.description}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ) : (
+                {totalRecs === 0 ? (
                     <div className="empty-state">
                         <div className="empty-state-icon"><HiOutlineLightBulb size={48} /></div>
                         <h3>No recommendations yet</h3>
-                        <p>Add menu items and start taking orders to receive actionable business suggestions.</p>
+                        <p>Add menu items and start taking orders to receive actionable suggestions.</p>
+                    </div>
+                ) : (
+                    <div className="rec-grid animate-fade-in-up">
+
+                        {/* =============== 1. INCREASE PRICE =============== */}
+                        <div className="rec-section rec-section--green">
+                            <div className="rec-section-header">
+                                <div className="rec-section-icon" style={{ background: 'var(--success-50)', color: 'var(--success-600)' }}>
+                                    <HiOutlineTrendingUp size={20} />
+                                </div>
+                                <div>
+                                    <h3>Increase Price</h3>
+                                    <p>High-demand items that can earn you more</p>
+                                </div>
+                            </div>
+                            <div className="rec-cards">
+                                {increasePrice.length > 0 ? increasePrice.map(item => (
+                                    <div key={item.menuItemId} className="rec-card">
+                                        <ItemImage src={item.imageUrl} name={item.name} />
+                                        <div className="rec-card-body">
+                                            <div className="rec-card-name">{item.name}</div>
+                                            <div className="rec-card-pricing">
+                                                <span className="rec-price-old">₹{item.price}</span>
+                                                <span className="rec-arrow">→</span>
+                                                <span className="rec-price-new">₹{item.suggestedPrice}</span>
+                                            </div>
+                                            <div className="rec-card-reason">
+                                                {item.ordersPerDay}/day orders • {item.marginPercentage}% margin
+                                            </div>
+                                            <button
+                                                className="btn btn-sm rec-action-btn rec-action-btn--green"
+                                                disabled={actionLoading[`price-${item.menuItemId}`]}
+                                                onClick={() => handleIncreasePrice(item)}
+                                            >
+                                                {actionLoading[`price-${item.menuItemId}`] ? 'Updating...' : `Increase ${item.name} Price`}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="rec-empty">No price increase suggestions right now</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* =============== 2. DROP ITEM =============== */}
+                        <div className="rec-section rec-section--red">
+                            <div className="rec-section-header">
+                                <div className="rec-section-icon" style={{ background: 'var(--error-50, #fef2f2)', color: 'var(--error-500)' }}>
+                                    <HiOutlineTrash size={20} />
+                                </div>
+                                <div>
+                                    <h3>Drop from Menu</h3>
+                                    <p>Low demand, high risk — not worth keeping</p>
+                                </div>
+                            </div>
+                            <div className="rec-cards">
+                                {dropItems.length > 0 ? dropItems.map(item => (
+                                    <div key={item.menuItemId} className="rec-card">
+                                        <ItemImage src={item.imageUrl} name={item.name} />
+                                        <div className="rec-card-body">
+                                            <div className="rec-card-name">{item.name}</div>
+                                            <div className="rec-card-reason" style={{ color: 'var(--error-500)' }}>
+                                                Only {item.ordersPerDay}/day • ₹{item.contributionMargin.toFixed(0)} profit per sale
+                                            </div>
+                                            <div className="rec-card-reason">
+                                                Low orders and low margin — not contributing to revenue
+                                            </div>
+                                            <button
+                                                className="btn btn-sm rec-action-btn rec-action-btn--red"
+                                                disabled={actionLoading[`drop-${item.menuItemId}`]}
+                                                onClick={() => handleDropItem(item)}
+                                            >
+                                                {actionLoading[`drop-${item.menuItemId}`] ? 'Removing...' : `Remove ${item.name}`}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="rec-empty">No items to drop right now</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* =============== 3. PROMOTE ITEM =============== */}
+                        <div className="rec-section rec-section--purple">
+                            <div className="rec-section-header">
+                                <div className="rec-section-icon" style={{ background: 'var(--accent-50)', color: 'var(--accent-600)' }}>
+                                    <HiOutlineSpeakerphone size={20} />
+                                </div>
+                                <div>
+                                    <h3>Promote Item</h3>
+                                    <p>Hidden gems with good profit — advertise them</p>
+                                </div>
+                            </div>
+                            <div className="rec-cards">
+                                {promoteItems.length > 0 ? promoteItems.map(item => (
+                                    <div key={item.menuItemId} className="rec-card">
+                                        <ItemImage src={item.imageUrl} name={item.name} />
+                                        <div className="rec-card-body">
+                                            <div className="rec-card-name">{item.name}</div>
+                                            <div className="rec-card-pricing">
+                                                <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent-600)' }}>₹{item.contributionMargin.toFixed(0)} profit</span>
+                                            </div>
+                                            <div className="rec-card-reason">
+                                                Great margin ({item.marginPercentage}%) but only {item.ordersPerDay} orders/day. Feature on menu, add photos, or promote on social media.
+                                            </div>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="rec-empty">No promotion suggestions right now</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* =============== 4. ADD DISCOUNT =============== */}
+                        <div className="rec-section rec-section--amber">
+                            <div className="rec-section-header">
+                                <div className="rec-section-icon" style={{ background: 'var(--warning-50)', color: 'var(--warning-600, #d97706)' }}>
+                                    <HiOutlineTag size={20} />
+                                </div>
+                                <div>
+                                    <h3>Add Discount</h3>
+                                    <p>Boost slowing items with limited-time offers</p>
+                                </div>
+                            </div>
+                            <div className="rec-cards">
+                                {discountItems.length > 0 ? discountItems.map(item => (
+                                    <div key={item.menuItemId} className="rec-card">
+                                        <ItemImage src={item.imageUrl} name={item.name} />
+                                        <div className="rec-card-body">
+                                            <div className="rec-card-name">{item.name}</div>
+                                            <div className="rec-card-pricing">
+                                                <span className="rec-price-old">₹{item.price}</span>
+                                                <span className="rec-discount-badge">-{item.discountPct}%</span>
+                                                <span className="rec-price-new" style={{ color: 'var(--warning-600, #d97706)' }}>₹{item.discountedPrice}</span>
+                                            </div>
+                                            <div className="rec-card-reason">
+                                                {item.trend === 'down' ? 'Demand is declining' : 'Moderate demand'} — a {item.discountPct}% discount can attract more customers and increase order volume.
+                                            </div>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="rec-empty">No discount suggestions right now</div>
+                                )}
+                            </div>
+                        </div>
+
                     </div>
                 )}
             </div>
