@@ -2,18 +2,24 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
     HiOutlineHome, HiOutlineClipboardList, HiOutlineChartBar,
-    HiOutlineShoppingBag, HiOutlineStar, HiOutlineCurrencyDollar,
-    HiOutlineLogout, HiOutlineMenu, HiOutlineX
+    HiOutlineStar, HiOutlineCurrencyDollar, HiOutlineLogout,
+    HiOutlineMenu, HiOutlineX, HiOutlineTrendingUp,
+    HiOutlineExclamationCircle, HiOutlineLightBulb, HiOutlineSparkles
 } from 'react-icons/hi';
 import { useState } from 'react';
 
-const ownerNavItems = [
+const managementNav = [
     { path: '/owner/dashboard', label: 'Dashboard', icon: HiOutlineHome },
     { path: '/owner/menu', label: 'Menu Manager', icon: HiOutlineClipboardList },
-    { path: '/owner/orders', label: 'Orders', icon: HiOutlineShoppingBag },
-    { path: '/owner/analytics', label: 'Revenue Analytics', icon: HiOutlineChartBar },
+];
+
+const intelligenceNav = [
+    { path: '/owner/contribution-margin', label: 'Contribution Margin', icon: HiOutlineChartBar },
+    { path: '/owner/popularity-score', label: 'Popularity Score', icon: HiOutlineTrendingUp },
     { path: '/owner/hidden-stars', label: 'Hidden Stars', icon: HiOutlineStar },
-    { path: '/owner/price-optimization', label: 'Price Optimizer', icon: HiOutlineCurrencyDollar },
+    { path: '/owner/risk-detection', label: 'Risk Detection', icon: HiOutlineExclamationCircle },
+    { path: '/owner/recommendations', label: 'Recommendations', icon: HiOutlineLightBulb },
+    { path: '/owner/combo-pricing', label: 'Combo & Pricing', icon: HiOutlineCurrencyDollar },
 ];
 
 export default function OwnerLayout({ children }) {
@@ -55,7 +61,7 @@ export default function OwnerLayout({ children }) {
 
                 <nav className="sidebar-nav">
                     <div className="sidebar-section-label">Management</div>
-                    {ownerNavItems.slice(0, 3).map((item) => (
+                    {managementNav.map((item) => (
                         <NavLink
                             key={item.path}
                             to={item.path}
@@ -68,7 +74,7 @@ export default function OwnerLayout({ children }) {
                     ))}
 
                     <div className="sidebar-section-label">AI Intelligence</div>
-                    {ownerNavItems.slice(3).map((item) => (
+                    {intelligenceNav.map((item) => (
                         <NavLink
                             key={item.path}
                             to={item.path}
