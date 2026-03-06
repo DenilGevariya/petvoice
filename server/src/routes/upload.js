@@ -41,7 +41,7 @@ router.post('/image', authMiddleware, upload.single('image'), async (req, res) =
                 {
                     folder: 'petvoice/menu-items',
                     transformation: [
-                        { width: 600, height: 400, crop: 'fill', gravity: 'auto', quality: 'auto', format: 'webp' }
+                        { width: 800, height: 600, crop: 'limit', quality: 'auto', format: 'webp' }
                     ],
                 },
                 (error, result) => {
