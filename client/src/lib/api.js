@@ -65,6 +65,7 @@ export const api = {
     // Analytics
     getDashboard: (restaurantId) => apiRequest(`/analytics/dashboard/${restaurantId}`),
     getMargins: (restaurantId) => apiRequest(`/analytics/margins/${restaurantId}`),
+    getOrderMargins: (restaurantId) => apiRequest(`/analytics/order-margins/${restaurantId}`),
     getClassification: (restaurantId) => apiRequest(`/analytics/classification/${restaurantId}`),
     getHiddenStars: (restaurantId) => apiRequest(`/analytics/hidden-stars/${restaurantId}`),
     getComboSuggestions: (restaurantId) => apiRequest(`/analytics/combo-suggestions/${restaurantId}`),

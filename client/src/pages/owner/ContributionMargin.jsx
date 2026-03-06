@@ -2,25 +2,28 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import OwnerLayout from '../../components/layout/OwnerLayout';
 import { api } from '../../lib/api';
-import { HiOutlineChartBar, HiOutlineSortDescending, HiOutlineSortAscending } from 'react-icons/hi';
+import {
+    HiOutlineChartBar, HiOutlineSortDescending, HiOutlineSortAscending,
+    HiOutlineCurrencyRupee, HiOutlineShoppingBag, HiOutlineTrendingUp,
+} from 'react-icons/hi';
 
 export default function ContributionMargin() {
     const navigate = useNavigate();
-    const [margins, setMargins] = useState([]);
+    const [orders, setOrders] = useState([]);
+    const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [sortField, setSortField] = useState('contributionMargin');
+    const [sortField, setSortField] = useState('createdAt');
     const [sortDir, setSortDir] = useState('desc');
 
-    useEffect(() => {
-        loadData();
-    }, []);
+    useEffect(() => { loadData(); }, []);
 
     const loadData = async () => {
         try {
             const res = await api.getMyRestaurant();
             if (!res.data) return navigate('/owner/setup');
-            const result = await api.getMargins(res.data.id);
-            setMargins(result.data || []);
+            const result = await api.getOrderMargins(res.data.id);
+            setOrders(result.data?.orders || []);
+            setSummary(result.data?.summary || null);
         } catch (err) {
             console.error(err);
         } finally {
@@ -37,9 +40,15 @@ export default function ContributionMargin() {
         }
     };
 
-    const sorted = [...margins].sort((a, b) => {
-        const aVal = parseFloat(a[sortField]) || 0;
-        const bVal = parseFloat(b[sortField]) || 0;
+    const sorted = [...orders].sort((a, b) => {
+        let aVal, bVal;
+        if (sortField === 'createdAt') {
+            aVal = new Date(a.createdAt).getTime();
+            bVal = new Date(b.createdAt).getTime();
+        } else {
+            aVal = parseFloat(a[sortField]) || 0;
+            bVal = parseFloat(b[sortField]) || 0;
+        }
         return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
     });
 
@@ -48,9 +57,18 @@ export default function ContributionMargin() {
         return sortDir === 'desc' ? <HiOutlineSortDescending size={14} /> : <HiOutlineSortAscending size={14} />;
     };
 
-    // Summary stats
-    const avgMargin = margins.length > 0 ? (margins.reduce((s, m) => s + m.contributionMargin, 0) / margins.length).toFixed(2) : 0;
-    const avgContribution = margins.length > 0 ? (margins.reduce((s, m) => s + parseFloat(m.marginPercentage), 0) / margins.length).toFixed(1) : 0;
+    const formatDate = (d) => {
+        const dt = new Date(d);
+        return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' }) +
+            ' ' + dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    const profitColor = (profit) => {
+        if (profit >= 100) return 'var(--success-600)';
+        if (profit >= 30) return 'var(--brand-600)';
+        if (profit >= 0) return 'var(--warning-600, #d97706)';
+        return 'var(--error-500)';
+    };
 
     if (loading) {
         return (
@@ -66,95 +84,95 @@ export default function ContributionMargin() {
         <OwnerLayout>
             <div className="page-container">
                 <div className="page-header">
-                    <h1>📊 Contribution Margin Analysis</h1>
-                    <p>Analyze the profitability of each menu item based on selling price and cost price</p>
+                    <h1>📊 Contribution Margin — Order Level</h1>
+                    <p>See the profit generated from each customer order</p>
                 </div>
 
                 {/* Summary Cards */}
-                <div className="stats-grid stagger-children">
-                    <div className="stat-card animate-fade-in-up">
-                        <div className="stat-icon brand"><HiOutlineChartBar /></div>
-                        <div>
-                            <div className="stat-value">{margins.length}</div>
-                            <div className="stat-label">Menu Items</div>
+                {summary && (
+                    <div className="stats-grid stagger-children">
+                        <div className="stat-card animate-fade-in-up">
+                            <div className="stat-icon brand"><HiOutlineShoppingBag /></div>
+                            <div>
+                                <div className="stat-value">{summary.totalOrders}</div>
+                                <div className="stat-label">Total Orders</div>
+                            </div>
+                        </div>
+                        <div className="stat-card animate-fade-in-up">
+                            <div className="stat-icon accent"><HiOutlineCurrencyRupee /></div>
+                            <div>
+                                <div className="stat-value">₹{summary.totalRevenue.toLocaleString()}</div>
+                                <div className="stat-label">Total Revenue</div>
+                            </div>
+                        </div>
+                        <div className="stat-card animate-fade-in-up">
+                            <div className="stat-icon success"><HiOutlineTrendingUp /></div>
+                            <div>
+                                <div className="stat-value" style={{ color: 'var(--success-600)' }}>₹{summary.totalProfit.toLocaleString()}</div>
+                                <div className="stat-label">Total Profit</div>
+                            </div>
+                        </div>
+                        <div className="stat-card animate-fade-in-up">
+                            <div className="stat-icon warning"><HiOutlineChartBar /></div>
+                            <div>
+                                <div className="stat-value">₹{summary.avgProfitPerOrder.toLocaleString()}</div>
+                                <div className="stat-label">Avg Profit / Order</div>
+                            </div>
                         </div>
                     </div>
-                    <div className="stat-card animate-fade-in-up">
-                        <div className="stat-icon success">₹</div>
-                        <div>
-                            <div className="stat-value">₹{avgMargin}</div>
-                            <div className="stat-label">Avg Margin / Item</div>
-                        </div>
-                    </div>
-                    <div className="stat-card animate-fade-in-up">
-                        <div className="stat-icon accent">%</div>
-                        <div>
-                            <div className="stat-value">{avgContribution}%</div>
-                            <div className="stat-label">Avg Contribution %</div>
-                        </div>
-                    </div>
-                </div>
+                )}
 
-                {/* Margin Table */}
-                {margins.length > 0 ? (
+                {/* Order Margin Table */}
+                {orders.length > 0 ? (
                     <div className="card animate-fade-in-up">
                         <div className="card-header">
                             <div>
-                                <div className="card-title">Item-wise Contribution Margin</div>
-                                <div className="card-subtitle">Click column headers to sort • margin = selling price − cost price • contribution % = (margin ÷ selling price) × 100</div>
+                                <div className="card-title">Order-wise Contribution Margin</div>
+                                <div className="card-subtitle">Click column headers to sort • Profit = Selling Price − Cost Price</div>
                             </div>
                         </div>
                         <div style={{ overflowX: 'auto' }}>
                             <table className="data-table">
                                 <thead>
                                     <tr>
-                                        <th>Item</th>
-                                        <th style={{ cursor: 'pointer' }} onClick={() => handleSort('price')}>
-                                            Selling Price <SortIcon field="price" />
+                                        <th style={{ cursor: 'pointer' }} onClick={() => handleSort('createdAt')}>
+                                            Order <SortIcon field="createdAt" />
                                         </th>
-                                        <th style={{ cursor: 'pointer' }} onClick={() => handleSort('costPrice')}>
-                                            Cost Price <SortIcon field="costPrice" />
+                                        <th>Items Ordered</th>
+                                        <th style={{ cursor: 'pointer' }} onClick={() => handleSort('sellingTotal')}>
+                                            Selling Price <SortIcon field="sellingTotal" />
                                         </th>
-                                        <th style={{ cursor: 'pointer' }} onClick={() => handleSort('contributionMargin')}>
-                                            Margin (₹) <SortIcon field="contributionMargin" />
+                                        <th style={{ cursor: 'pointer' }} onClick={() => handleSort('costTotal')}>
+                                            Cost Price <SortIcon field="costTotal" />
                                         </th>
-                                        <th style={{ cursor: 'pointer' }} onClick={() => handleSort('marginPercentage')}>
-                                            Contribution % <SortIcon field="marginPercentage" />
+                                        <th style={{ cursor: 'pointer' }} onClick={() => handleSort('profit')}>
+                                            Profit <SortIcon field="profit" />
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {sorted.map((item) => {
-                                        const marginPct = parseFloat(item.marginPercentage);
-                                        const marginColor = marginPct >= 60 ? 'var(--success-600)' : marginPct >= 40 ? 'var(--brand-600)' : marginPct >= 20 ? 'var(--warning-600)' : 'var(--error-500)';
-                                        return (
-                                            <tr key={item.id}>
-                                                <td>
-                                                    <div style={{ fontWeight: 600, color: 'var(--neutral-800)' }}>{item.name}</div>
-                                                    {item.category && <div style={{ fontSize: 12, color: 'var(--neutral-500)' }}>{item.category}</div>}
-                                                </td>
-                                                <td style={{ fontWeight: 600 }}>₹{item.price.toFixed(2)}</td>
-                                                <td style={{ color: 'var(--neutral-500)' }}>₹{item.costPrice.toFixed(2)}</td>
-                                                <td style={{ fontWeight: 700, color: marginColor }}>₹{item.contributionMargin.toFixed(2)}</td>
-                                                <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                        <div style={{
-                                                            width: 60, height: 6, borderRadius: 3,
-                                                            background: 'var(--neutral-100)', overflow: 'hidden'
-                                                        }}>
-                                                            <div style={{
-                                                                width: `${Math.min(marginPct, 100)}%`, height: '100%',
-                                                                borderRadius: 3, background: marginColor
-                                                            }} />
-                                                        </div>
-                                                        <span style={{ fontWeight: 600, color: marginColor, fontSize: 13 }}>
-                                                            {item.marginPercentage}%
+                                    {sorted.map((order) => (
+                                        <tr key={order.orderId}>
+                                            <td>
+                                                <div style={{ fontWeight: 600, color: 'var(--neutral-800)' }}>#{order.orderNumber}</div>
+                                                <div style={{ fontSize: 11, color: 'var(--neutral-400)' }}>{formatDate(order.createdAt)}</div>
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                    {order.items.map((item, i) => (
+                                                        <span key={i} style={{ fontSize: 13, color: 'var(--neutral-700)' }}>
+                                                            {item.name} {item.qty > 1 ? `×${item.qty}` : ''}
                                                         </span>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                                    ))}
+                                                </div>
+                                            </td>
+                                            <td style={{ fontWeight: 600 }}>₹{order.sellingTotal.toLocaleString()}</td>
+                                            <td style={{ color: 'var(--neutral-500)' }}>₹{order.costTotal.toLocaleString()}</td>
+                                            <td style={{ fontWeight: 700, color: profitColor(order.profit) }}>
+                                                ₹{order.profit.toLocaleString()}
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
@@ -162,8 +180,8 @@ export default function ContributionMargin() {
                 ) : (
                     <div className="empty-state">
                         <div className="empty-state-icon">📊</div>
-                        <h3>No menu items yet</h3>
-                        <p>Add menu items with cost prices to see contribution margin analysis.</p>
+                        <h3>No orders yet</h3>
+                        <p>Once customers place orders, you'll see the profit breakdown for each order here.</p>
                     </div>
                 )}
             </div>

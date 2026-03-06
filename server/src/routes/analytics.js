@@ -256,6 +256,86 @@ router.get('/margins/:restaurantId', authMiddleware, ownerMiddleware, async (req
     }
 });
 
+// ================== ORDER-LEVEL CONTRIBUTION MARGIN ==================
+router.get('/order-margins/:restaurantId', authMiddleware, ownerMiddleware, async (req, res) => {
+    try {
+        const restaurantId = req.params.restaurantId;
+
+        // Verify ownership
+        const ownership = await query('SELECT id FROM restaurants WHERE id = $1 AND owner_id = $2', [restaurantId, req.user.id]);
+        if (ownership.rows.length === 0) {
+            return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Not your restaurant' } });
+        }
+
+        const orders = await query(
+            `SELECT
+                o.id as order_id,
+                o.order_number,
+                o.total as order_total,
+                o.created_at,
+                json_agg(json_build_object(
+                    'name', mi.name,
+                    'qty', oi.quantity,
+                    'unitPrice', oi.unit_price,
+                    'costPrice', mi.cost_price,
+                    'lineTotal', oi.total_price,
+                    'lineCost', mi.cost_price * oi.quantity
+                )) as items,
+                SUM(oi.total_price) as selling_total,
+                SUM(mi.cost_price * oi.quantity) as cost_total
+             FROM orders o
+             JOIN order_items oi ON oi.order_id = o.id
+             JOIN menu_items mi ON oi.menu_item_id = mi.id
+             WHERE o.restaurant_id = $1 AND o.status != 'cancelled'
+             GROUP BY o.id, o.order_number, o.total, o.created_at
+             ORDER BY o.created_at DESC
+             LIMIT 100`,
+            [restaurantId]
+        );
+
+        const data = orders.rows.map(row => {
+            const sellingTotal = parseFloat(row.selling_total) || 0;
+            const costTotal = parseFloat(row.cost_total) || 0;
+            const profit = sellingTotal - costTotal;
+            return {
+                orderId: row.order_id,
+                orderNumber: row.order_number,
+                createdAt: row.created_at,
+                items: row.items.map(i => ({
+                    name: i.name,
+                    qty: i.qty,
+                    unitPrice: parseFloat(i.unitPrice),
+                    costPrice: parseFloat(i.costPrice),
+                })),
+                sellingTotal: parseFloat(sellingTotal.toFixed(2)),
+                costTotal: parseFloat(costTotal.toFixed(2)),
+                profit: parseFloat(profit.toFixed(2)),
+            };
+        });
+
+        // Summary
+        const totalProfit = data.reduce((s, o) => s + o.profit, 0);
+        const totalRevenue = data.reduce((s, o) => s + o.sellingTotal, 0);
+        const avgProfitPerOrder = data.length > 0 ? totalProfit / data.length : 0;
+
+        res.json({
+            success: true,
+            data: {
+                orders: data,
+                summary: {
+                    totalOrders: data.length,
+                    totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+                    totalProfit: parseFloat(totalProfit.toFixed(2)),
+                    avgProfitPerOrder: parseFloat(avgProfitPerOrder.toFixed(2)),
+                },
+            },
+        });
+    } catch (error) {
+        console.error('Order margins error:', error);
+        res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to get order margins' } });
+    }
+});
+
 // ================== ITEM CLASSIFICATION (BCG MATRIX) ==================
 router.get('/classification/:restaurantId', authMiddleware, ownerMiddleware, async (req, res) => {
     try {
