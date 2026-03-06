@@ -130,25 +130,38 @@ router.put('/:id', authMiddleware, ownerMiddleware, async (req, res) => {
 
         const result = await query(
             `UPDATE menu_items SET
-        name = COALESCE($1, name),
-        description = COALESCE($2, description),
-        price = COALESCE($3, price),
-        cost_price = COALESCE($4, cost_price),
-        category_id = COALESCE($5, category_id),
-        is_available = COALESCE($6, is_available),
-        is_veg = COALESCE($7, is_veg),
-        is_bestseller = COALESCE($8, is_bestseller),
-        spice_level = COALESCE($9, spice_level),
-        preparation_time = COALESCE($10, preparation_time)
+            name = $1,
+            description = $2,
+            price = $3,
+            cost_price = $4,
+            category_id = $5,
+            is_available = $6,
+            is_veg = $7,
+            is_bestseller = $8,
+            spice_level = $9,
+            preparation_time = $10,
+            updated_at = NOW()
        WHERE id = $11
        RETURNING *`,
-            [name, description, price, costPrice, categoryId, isAvailable, isVeg, isBestseller, spiceLevel, preparationTime, req.params.id]
+            [
+                name,
+                description || null,
+                price,
+                costPrice || 0,
+                categoryId || null,
+                isAvailable !== undefined ? isAvailable : true,
+                isVeg || false,
+                isBestseller || false,
+                spiceLevel || 0,
+                preparationTime || 15,
+                req.params.id
+            ]
         );
 
         res.json({ success: true, data: formatMenuItem(result.rows[0]) });
     } catch (error) {
         console.error('Update menu item error:', error);
-        res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to update menu item' } });
+        res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
     }
 });
 

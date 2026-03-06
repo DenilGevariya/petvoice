@@ -70,11 +70,16 @@ export default function MenuManager() {
         try {
             const body = {
                 restaurantId: restaurant.id,
-                ...itemForm,
+                name: itemForm.name,
+                description: itemForm.description || null,
                 price: parseFloat(itemForm.price),
                 costPrice: parseFloat(itemForm.costPrice) || 0,
-                spiceLevel: parseInt(itemForm.spiceLevel),
-                preparationTime: parseInt(itemForm.preparationTime),
+                categoryId: itemForm.categoryId || null,
+                isAvailable: itemForm.isAvailable,
+                isVeg: itemForm.isVeg,
+                isBestseller: itemForm.isBestseller,
+                spiceLevel: parseInt(itemForm.spiceLevel) || 0,
+                preparationTime: parseInt(itemForm.preparationTime) || 15,
             };
 
             if (editingItem) {

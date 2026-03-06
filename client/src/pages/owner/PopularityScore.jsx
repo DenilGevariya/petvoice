@@ -30,25 +30,31 @@ export default function PopularityScore() {
             ]);
 
             const margins = marginsRes.data || [];
-            const itemTrends = trendsRes.data?.itemTrends || [];
             const dailyTrends = trendsRes.data?.dailyTrends || [];
+            const itemHalfTrends = trendsRes.data?.itemHalfTrends || [];
             const numDays = Math.max(dailyTrends.length, 1);
 
             // Build popularity data for each item
             const popularityData = margins.map(item => {
-                const trend = itemTrends.find(t => t.name === item.name);
-                const totalSold = trend ? trend.totalSold : item.totalSales;
-                const ordersPerDay = totalSold / numDays;
+                const halfTrend = itemHalfTrends.find(t => t.name === item.name);
+                const totalSold = item.totalSales || 0;
+                const ordersPerDay = numDays > 0 ? totalSold / numDays : 0;
 
-                // Estimate trend: compare first half vs second half of daily data
-                // (simple heuristic since we have aggregate data)
-                const trendDirection = totalSold > 0 ? (ordersPerDay >= 2 ? 'up' : 'down') : 'flat';
+                // Compute trend from first-half vs second-half sales
+                let trendDirection = 'flat';
+                if (halfTrend) {
+                    if (halfTrend.secondHalf > halfTrend.firstHalf) trendDirection = 'up';
+                    else if (halfTrend.secondHalf < halfTrend.firstHalf) trendDirection = 'down';
+                    else trendDirection = 'flat';
+                }
 
                 return {
                     ...item,
                     totalSold,
                     ordersPerDay: parseFloat(ordersPerDay.toFixed(2)),
                     trend: trendDirection,
+                    firstHalf: halfTrend?.firstHalf || 0,
+                    secondHalf: halfTrend?.secondHalf || 0,
                     velocity: classifyVelocity(ordersPerDay),
                 };
             });
@@ -82,7 +88,7 @@ export default function PopularityScore() {
             <div className="page-container">
                 <div className="page-header">
                     <h1>📈 Popularity Score</h1>
-                    <p>Measure how frequently items are ordered and identify demand trends</p>
+                    <p>Measure how frequently items are ordered and identify demand trends (last 30 days)</p>
                 </div>
 
                 {/* Velocity Distribution */}
@@ -119,7 +125,7 @@ export default function PopularityScore() {
                         <div className="card-header">
                             <div>
                                 <div className="card-title">Item Popularity Analysis</div>
-                                <div className="card-subtitle">Based on the last 30 days of sales data</div>
+                                <div className="card-subtitle">orders_per_day = total_orders ÷ number_of_days • Trend compares first 15 days vs last 15 days</div>
                             </div>
                         </div>
                         <div style={{ overflowX: 'auto' }}>
@@ -131,7 +137,7 @@ export default function PopularityScore() {
                                         <th>Total Sold (30d)</th>
                                         <th>Orders / Day</th>
                                         <th>Trend</th>
-                                        <th>Velocity</th>
+                                        <th>Result</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -154,7 +160,7 @@ export default function PopularityScore() {
                                                         <HiOutlineTrendingDown size={18} /> Decreasing
                                                     </span>
                                                 ) : (
-                                                    <span style={{ color: 'var(--neutral-400)' }}>—</span>
+                                                    <span style={{ color: 'var(--neutral-400)' }}>— No data</span>
                                                 )}
                                             </td>
                                             <td>

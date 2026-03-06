@@ -38,8 +38,8 @@ export default function ContributionMargin() {
     };
 
     const sorted = [...margins].sort((a, b) => {
-        const aVal = a[sortField] || 0;
-        const bVal = b[sortField] || 0;
+        const aVal = parseFloat(a[sortField]) || 0;
+        const bVal = parseFloat(b[sortField]) || 0;
         return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
     });
 
@@ -51,7 +51,6 @@ export default function ContributionMargin() {
     // Summary stats
     const avgMargin = margins.length > 0 ? (margins.reduce((s, m) => s + m.contributionMargin, 0) / margins.length).toFixed(2) : 0;
     const avgContribution = margins.length > 0 ? (margins.reduce((s, m) => s + parseFloat(m.marginPercentage), 0) / margins.length).toFixed(1) : 0;
-    const totalProfit = margins.reduce((s, m) => s + m.totalProfit, 0);
 
     if (loading) {
         return (
@@ -94,13 +93,6 @@ export default function ContributionMargin() {
                             <div className="stat-label">Avg Contribution %</div>
                         </div>
                     </div>
-                    <div className="stat-card animate-fade-in-up">
-                        <div className="stat-icon warning">💰</div>
-                        <div>
-                            <div className="stat-value">₹{totalProfit.toLocaleString()}</div>
-                            <div className="stat-label">Total Profit (All Time)</div>
-                        </div>
-                    </div>
                 </div>
 
                 {/* Margin Table */}
@@ -109,7 +101,7 @@ export default function ContributionMargin() {
                         <div className="card-header">
                             <div>
                                 <div className="card-title">Item-wise Contribution Margin</div>
-                                <div className="card-subtitle">Click column headers to sort</div>
+                                <div className="card-subtitle">Click column headers to sort • margin = selling price − cost price • contribution % = (margin ÷ selling price) × 100</div>
                             </div>
                         </div>
                         <div style={{ overflowX: 'auto' }}>
@@ -128,12 +120,6 @@ export default function ContributionMargin() {
                                         </th>
                                         <th style={{ cursor: 'pointer' }} onClick={() => handleSort('marginPercentage')}>
                                             Contribution % <SortIcon field="marginPercentage" />
-                                        </th>
-                                        <th style={{ cursor: 'pointer' }} onClick={() => handleSort('totalSales')}>
-                                            Total Sales <SortIcon field="totalSales" />
-                                        </th>
-                                        <th style={{ cursor: 'pointer' }} onClick={() => handleSort('totalProfit')}>
-                                            Total Profit <SortIcon field="totalProfit" />
                                         </th>
                                     </tr>
                                 </thead>
@@ -166,8 +152,6 @@ export default function ContributionMargin() {
                                                         </span>
                                                     </div>
                                                 </td>
-                                                <td style={{ color: 'var(--neutral-600)' }}>{item.totalSales}</td>
-                                                <td style={{ fontWeight: 600, color: 'var(--success-600)' }}>₹{item.totalProfit.toFixed(2)}</td>
                                             </tr>
                                         );
                                     })}

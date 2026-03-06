@@ -144,28 +144,46 @@ router.get('/margins/:restaurantId', authMiddleware, ownerMiddleware, async (req
         const restaurantId = req.params.restaurantId;
 
         const items = await query(
-            `SELECT mi.*, mc.name as category_name
-       FROM menu_items mi
-       LEFT JOIN menu_categories mc ON mi.category_id = mc.id
-       WHERE mi.restaurant_id = $1
-       ORDER BY (mi.price - mi.cost_price) DESC`,
+            `SELECT mi.*, mc.name as category_name,
+                    COALESCE(oi_agg.actual_sales, 0) as actual_sales,
+                    COALESCE(oi_agg.actual_revenue, 0) as actual_revenue
+             FROM menu_items mi
+             LEFT JOIN menu_categories mc ON mi.category_id = mc.id
+             LEFT JOIN (
+                SELECT oi.menu_item_id,
+                       SUM(oi.quantity) as actual_sales,
+                       SUM(oi.total_price) as actual_revenue
+                FROM order_items oi
+                JOIN orders o ON oi.order_id = o.id
+                WHERE o.restaurant_id = $1 AND o.status != 'cancelled'
+                GROUP BY oi.menu_item_id
+             ) oi_agg ON mi.id = oi_agg.menu_item_id
+             WHERE mi.restaurant_id = $1
+             ORDER BY (mi.price - mi.cost_price) DESC`,
             [restaurantId]
         );
 
-        const margins = items.rows.map(item => ({
-            id: item.id,
-            name: item.name,
-            category: item.category_name,
-            price: parseFloat(item.price),
-            costPrice: parseFloat(item.cost_price),
-            contributionMargin: parseFloat(item.price) - parseFloat(item.cost_price),
-            marginPercentage: parseFloat(item.price) > 0
-                ? (((parseFloat(item.price) - parseFloat(item.cost_price)) / parseFloat(item.price)) * 100).toFixed(1)
-                : 0,
-            totalSales: item.total_sales || 0,
-            totalProfit: (parseFloat(item.price) - parseFloat(item.cost_price)) * (item.total_sales || 0),
-            classification: item.classification
-        }));
+        const margins = items.rows.map(item => {
+            const price = parseFloat(item.price);
+            const costPrice = parseFloat(item.cost_price);
+            const margin = price - costPrice;
+            const totalSales = parseInt(item.actual_sales) || item.total_sales || 0;
+
+            return {
+                id: item.id,
+                name: item.name,
+                category: item.category_name,
+                price,
+                costPrice,
+                contributionMargin: margin,
+                marginPercentage: price > 0
+                    ? ((margin / price) * 100).toFixed(1)
+                    : 0,
+                totalSales,
+                totalProfit: margin * totalSales,
+                classification: item.classification
+            };
+        });
 
         res.json({ success: true, data: margins });
     } catch (error) {
@@ -226,23 +244,37 @@ router.get('/hidden-stars/:restaurantId', authMiddleware, ownerMiddleware, async
         const restaurantId = req.params.restaurantId;
 
         const items = await query(
-            `SELECT id, name, price, cost_price, total_sales, total_revenue, classification
-       FROM menu_items WHERE restaurant_id = $1`,
+            `SELECT mi.id, mi.name, mi.price, mi.cost_price, mi.classification,
+                    COALESCE(oi_agg.actual_sales, 0) as actual_sales
+             FROM menu_items mi
+             LEFT JOIN (
+                SELECT oi.menu_item_id, SUM(oi.quantity) as actual_sales
+                FROM order_items oi
+                JOIN orders o ON oi.order_id = o.id
+                WHERE o.restaurant_id = $1 AND o.status != 'cancelled'
+                GROUP BY oi.menu_item_id
+             ) oi_agg ON mi.id = oi_agg.menu_item_id
+             WHERE mi.restaurant_id = $1`,
             [restaurantId]
         );
 
         if (items.rows.length === 0) {
-            return res.json({ success: true, data: [] });
+            return res.json({ success: true, data: { hiddenStars: [], avgSales: 0, avgMargin: 0, aiRecommendations: null } });
         }
 
-        const avgSales = items.rows.reduce((sum, i) => sum + (i.total_sales || 0), 0) / items.rows.length;
-        const avgMargin = items.rows.reduce((sum, i) => sum + (parseFloat(i.price) - parseFloat(i.cost_price)), 0) / items.rows.length;
+        const itemsWithSales = items.rows.map(i => ({
+            ...i,
+            total_sales: parseInt(i.actual_sales) || i.total_sales || 0
+        }));
 
-        // Hidden stars: high margin but low sales (classification = 'puzzle')
-        const hiddenStars = items.rows
+        const avgSales = itemsWithSales.reduce((sum, i) => sum + i.total_sales, 0) / itemsWithSales.length;
+        const avgMargin = itemsWithSales.reduce((sum, i) => sum + (parseFloat(i.price) - parseFloat(i.cost_price)), 0) / itemsWithSales.length;
+
+        // Hidden stars: high margin but low sales
+        const hiddenStars = itemsWithSales
             .filter(item => {
                 const margin = parseFloat(item.price) - parseFloat(item.cost_price);
-                return margin >= avgMargin && (item.total_sales || 0) < avgSales;
+                return margin >= avgMargin && item.total_sales < avgSales;
             })
             .map(item => ({
                 id: item.id,
@@ -251,7 +283,7 @@ router.get('/hidden-stars/:restaurantId', authMiddleware, ownerMiddleware, async
                 costPrice: parseFloat(item.cost_price),
                 margin: parseFloat(item.price) - parseFloat(item.cost_price),
                 marginPercentage: (((parseFloat(item.price) - parseFloat(item.cost_price)) / parseFloat(item.price)) * 100).toFixed(1),
-                totalSales: item.total_sales || 0,
+                totalSales: item.total_sales,
                 potential: 'High margin item with low visibility — promote this item!'
             }));
 
@@ -461,24 +493,55 @@ router.get('/sales-trends/:restaurantId', authMiddleware, ownerMiddleware, async
         const { days } = req.query;
         const lookback = parseInt(days) || 30;
 
+        // Daily trends from orders table directly
         const dailyTrends = await query(
-            `SELECT sale_date, SUM(quantity_sold) as total_quantity, SUM(revenue) as total_revenue, SUM(profit) as total_profit
-       FROM daily_sales 
-       WHERE restaurant_id = $1 AND sale_date >= CURRENT_DATE - $2::integer
-       GROUP BY sale_date
-       ORDER BY sale_date ASC`,
+            `SELECT DATE(o.created_at) as sale_date,
+                    SUM(oi.quantity) as total_quantity,
+                    SUM(oi.total_price) as total_revenue,
+                    SUM(oi.total_price - (mi.cost_price * oi.quantity)) as total_profit
+             FROM order_items oi
+             JOIN orders o ON oi.order_id = o.id
+             LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+             WHERE o.restaurant_id = $1
+               AND o.status != 'cancelled'
+               AND o.created_at >= CURRENT_DATE - $2::integer
+             GROUP BY DATE(o.created_at)
+             ORDER BY sale_date ASC`,
             [restaurantId, lookback]
         );
 
+        // Per-item trends from orders table directly
         const itemTrends = await query(
-            `SELECT mi.name, SUM(ds.quantity_sold) as total_sold, SUM(ds.revenue) as total_revenue, SUM(ds.profit) as total_profit
-       FROM daily_sales ds
-       JOIN menu_items mi ON ds.menu_item_id = mi.id
-       WHERE ds.restaurant_id = $1 AND ds.sale_date >= CURRENT_DATE - $2::integer
-       GROUP BY mi.name
-       ORDER BY total_sold DESC
-       LIMIT 10`,
+            `SELECT mi.name,
+                    SUM(oi.quantity) as total_sold,
+                    SUM(oi.total_price) as total_revenue,
+                    SUM(oi.total_price - (mi.cost_price * oi.quantity)) as total_profit
+             FROM order_items oi
+             JOIN orders o ON oi.order_id = o.id
+             JOIN menu_items mi ON oi.menu_item_id = mi.id
+             WHERE o.restaurant_id = $1
+               AND o.status != 'cancelled'
+               AND o.created_at >= CURRENT_DATE - $2::integer
+             GROUP BY mi.name
+             ORDER BY total_sold DESC
+             LIMIT 10`,
             [restaurantId, lookback]
+        );
+
+        // Per-item first-half vs second-half trends for popularity direction
+        const halfPoint = Math.floor(lookback / 2);
+        const itemHalfTrends = await query(
+            `SELECT mi.id, mi.name,
+                    SUM(CASE WHEN o.created_at >= CURRENT_DATE - $2::integer AND o.created_at < CURRENT_DATE - $3::integer THEN oi.quantity ELSE 0 END) as first_half_sales,
+                    SUM(CASE WHEN o.created_at >= CURRENT_DATE - $3::integer THEN oi.quantity ELSE 0 END) as second_half_sales
+             FROM order_items oi
+             JOIN orders o ON oi.order_id = o.id
+             JOIN menu_items mi ON oi.menu_item_id = mi.id
+             WHERE o.restaurant_id = $1
+               AND o.status != 'cancelled'
+               AND o.created_at >= CURRENT_DATE - $2::integer
+             GROUP BY mi.id, mi.name`,
+            [restaurantId, lookback, halfPoint]
         );
 
         res.json({
@@ -486,15 +549,21 @@ router.get('/sales-trends/:restaurantId', authMiddleware, ownerMiddleware, async
             data: {
                 dailyTrends: dailyTrends.rows.map(d => ({
                     date: d.sale_date,
-                    quantity: parseInt(d.total_quantity),
-                    revenue: parseFloat(d.total_revenue),
-                    profit: parseFloat(d.total_profit)
+                    quantity: parseInt(d.total_quantity) || 0,
+                    revenue: parseFloat(d.total_revenue) || 0,
+                    profit: parseFloat(d.total_profit) || 0
                 })),
                 itemTrends: itemTrends.rows.map(i => ({
                     name: i.name,
-                    totalSold: parseInt(i.total_sold),
-                    totalRevenue: parseFloat(i.total_revenue),
-                    totalProfit: parseFloat(i.total_profit)
+                    totalSold: parseInt(i.total_sold) || 0,
+                    totalRevenue: parseFloat(i.total_revenue) || 0,
+                    totalProfit: parseFloat(i.total_profit) || 0
+                })),
+                itemHalfTrends: itemHalfTrends.rows.map(i => ({
+                    id: i.id,
+                    name: i.name,
+                    firstHalf: parseInt(i.first_half_sales) || 0,
+                    secondHalf: parseInt(i.second_half_sales) || 0,
                 }))
             }
         });
