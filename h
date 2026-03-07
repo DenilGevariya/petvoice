@@ -1,0 +1,1 @@
+In the voice order there is problem occur after user say confirm order it not confirm the order and speake in JSON formate which is not require for user , it should perfect system for user and after confirm the order order should automatically add to respective restrurant

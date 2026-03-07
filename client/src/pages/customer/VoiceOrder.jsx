@@ -80,8 +80,7 @@ RULES:
 3. Allow customers to specify quantities (e.g., "2 veg burgers").
 4. After the customer finishes ordering, summarize the order clearly with item names and quantities.
 5. Ask for confirmation: "Would you like to confirm this order?"
-6. If customer confirms, respond with EXACTLY this JSON format and nothing else:
-{"confirmed":true,"items":[{"name":"EXACT_MENU_ITEM_NAME","quantity":NUMBER}]}
+6. If the customer confirms, verbally tell them their order has been successfully placed (e.g., "Thank you! Your order has been placed. It will be ready soon."). DO NOT output any JSON, brackets, or code. IMMEDIATELY call the "confirm_order" function to finalize the transaction securely in the background.
 7. If customer wants to cancel, say goodbye politely.
 8. You may suggest popular combos or additional items briefly, but don't be pushy.
 9. Keep responses conversational, warm and concise.
@@ -156,8 +155,34 @@ RULES:
                 }
 
                 // Function call or tool result from assistant
-                if (msg.type === 'function-call' || msg.type === 'tool-calls') {
-                    // handle if needed
+                if (msg.type === 'function-call') {
+                    if (msg.functionCall && msg.functionCall.name === 'confirm_order') {
+                        const args = msg.functionCall.parameters;
+                        if (args && Array.isArray(args.items)) {
+                            if (vapiRef.current) {
+                                try { vapiRef.current.stop(); } catch (e) { /* ignore */ }
+                            }
+                            setCallStatus('ended');
+                            autoPlaceOrder(args);
+                        }
+                    }
+                } else if (msg.type === 'tool-calls') {
+                    const calls = msg.toolCalls || [];
+                    for (const call of calls) {
+                        if (call.function && call.function.name === 'confirm_order') {
+                            let args = call.function.arguments;
+                            if (typeof args === 'string') {
+                                try { args = JSON.parse(args); } catch (e) { /* ignore */ }
+                            }
+                            if (args && Array.isArray(args.items)) {
+                                if (vapiRef.current) {
+                                    try { vapiRef.current.stop(); } catch (e) { /* ignore */ }
+                                }
+                                setCallStatus('ended');
+                                autoPlaceOrder(args);
+                            }
+                        }
+                    }
                 }
             });
 
@@ -175,6 +200,31 @@ RULES:
                     messages: [
                         { role: 'system', content: buildSystemPrompt() },
                     ],
+                    tools: [
+                        {
+                            type: 'function',
+                            function: {
+                                name: 'confirm_order',
+                                description: 'Trigger this function to finalize the order securely in the background when the user confirms their order.',
+                                parameters: {
+                                    type: 'object',
+                                    properties: {
+                                        items: {
+                                            type: 'array',
+                                            items: {
+                                                type: 'object',
+                                                properties: {
+                                                    name: { type: 'string' },
+                                                    quantity: { type: 'number' }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    required: ['items']
+                                }
+                            }
+                        }
+                    ]
                 },
                 voice: {
                     provider: '11labs',
