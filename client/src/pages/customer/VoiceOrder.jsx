@@ -21,6 +21,7 @@ export default function VoiceOrder() {
     const [restaurants, setRestaurants] = useState([]);
     const [selectedRestaurant, setSelectedRestaurant] = useState(null);
     const [menuItems, setMenuItems] = useState([]);
+    const [combos, setCombos] = useState([]);
     const [callStatus, setCallStatus] = useState('idle'); // idle | connecting | active | ended
     const [transcripts, setTranscripts] = useState([]);
     const [orderResult, setOrderResult] = useState(null);
@@ -55,37 +56,48 @@ export default function VoiceOrder() {
         setTranscripts([]);
         setOrderResult(null);
         try {
-            const res = await api.getMenuItems(restaurant.id);
-            setMenuItems(res.data || []);
+            const [menuRes, comboRes] = await Promise.all([
+                api.getMenuItems(restaurant.id),
+                api.getCombos(restaurant.id)
+            ]);
+            setMenuItems(menuRes.data || []);
+            setCombos(comboRes.data || []);
         } catch (err) {
             console.error(err);
         }
     };
 
     const buildSystemPrompt = useCallback(() => {
-        if (!selectedRestaurant || menuItems.length === 0) return '';
+        if (!selectedRestaurant || (menuItems.length === 0 && combos.length === 0)) return '';
 
         const menuStr = menuItems.map(mi =>
             `• ${mi.name} — ₹${mi.price}${mi.isVeg ? ' (Veg)' : ''}`
         ).join('\n');
 
+        const comboStr = combos.map(c =>
+            `• ${c.name} — ₹${c.comboPrice || c.combo_price} (Original: ₹${c.originalPrice || c.original_price}, ${c.discountPercentage || c.discount_percentage}% OFF)`
+        ).join('\n');
+
         return `You are a friendly voice ordering assistant for "${selectedRestaurant.name}" restaurant.
 
-MENU (only these items can be ordered):
+MENU ITEMS:
 ${menuStr}
+
+COMBOS & OFFERS:
+${comboStr || 'No combos available'}
 
 RULES:
 1. Greet the customer warmly and ask what they'd like to order.
-2. Only accept items from the menu above. If customer asks for something not on menu, politely say it's not available and suggest alternatives.
+2. Only accept items or combos from the list above. If user asks for something else, say it's not available.
 3. Allow customers to specify quantities (e.g., "2 veg burgers").
-4. After the customer finishes ordering, summarize the order clearly with item names and quantities.
-5. Ask for confirmation: "Would you like to confirm this order?"
-6. If the customer confirms, verbally tell them their order has been successfully placed (e.g., "Thank you! Your order has been placed. It will be ready soon."). DO NOT output any JSON, brackets, or code. IMMEDIATELY call the "confirm_order" function to finalize the transaction securely in the background.
-7. If customer wants to cancel, say goodbye politely.
-8. You may suggest popular combos or additional items briefly, but don't be pushy.
+4. If they ask for offers or deals, suggest the combos available above.
+5. After the customer finishes ordering, summarize the order clearly with item names and quantities.
+6. Ask for confirmation: "Would you like to confirm this order?"
+7. If the customer explicitly confirms (e.g. says "confirm order", "place order", "yes confirm"), verbally tell them their order has been placed securely and IMMEDIATELY call the "confirm_order" function to finalize the transaction securely in the background. DO NOT output any JSON, brackets, or code.
+8. If customer wants to cancel, say goodbye politely.
 9. Keep responses conversational, warm and concise.
 10. Always speak in the same language the customer uses.`;
-    }, [selectedRestaurant, menuItems]);
+    }, [selectedRestaurant, menuItems, combos]);
 
     const startCall = async () => {
         if (!VAPI_PUBLIC_KEY) {
@@ -96,8 +108,8 @@ RULES:
             toast.error('Please select a restaurant first');
             return;
         }
-        if (menuItems.length === 0) {
-            toast.error('No menu items available for this restaurant');
+        if (menuItems.length === 0 && combos.length === 0) {
+            toast.error('No menu items or combos available for this restaurant');
             return;
         }
 
@@ -360,21 +372,33 @@ RULES:
                     </div>
 
                     {/* Menu preview */}
-                    {selectedRestaurant && menuItems.length > 0 && (
-                        <div className="vo-menu-preview">
-                            <div className="vo-sidebar-title">Menu — {menuItems.length} items</div>
-                            <div className="vo-menu-list">
-                                {menuItems.slice(0, 8).map(mi => (
-                                    <div key={mi.id} className="vo-menu-chip">
-                                        {mi.name} <span>₹{mi.price}</span>
+                    {selectedRestaurant && (menuItems.length > 0 || combos.length > 0) && (
+                        <div className="vo-menu-preview" style={{ flex: 1, overflowY: 'auto' }}>
+                            {combos.length > 0 && (
+                                <div style={{ marginBottom: '16px' }}>
+                                    <div className="vo-sidebar-title" style={{ color: 'var(--brand-500)', fontWeight: 'bold' }}>Offers & Combos</div>
+                                    <div className="vo-menu-list">
+                                        {combos.map(c => (
+                                            <div key={c.id} className="vo-menu-chip" style={{ border: '1px solid var(--brand-300)', backgroundColor: 'var(--brand-50)' }}>
+                                                {c.name} <span>₹{c.comboPrice || c.combo_price}</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                                {menuItems.length > 8 && (
-                                    <div className="vo-menu-chip" style={{ opacity: 0.5 }}>
-                                        +{menuItems.length - 8} more
+                                </div>
+                            )}
+
+                            {menuItems.length > 0 && (
+                                <div>
+                                    <div className="vo-sidebar-title">Complete Menu</div>
+                                    <div className="vo-menu-list">
+                                        {menuItems.map(mi => (
+                                            <div key={mi.id} className="vo-menu-chip">
+                                                {mi.name} <span>₹{mi.price}</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

@@ -367,8 +367,14 @@ router.post('/voice-order', authMiddleware, async (req, res) => {
             [restaurantId]
         );
 
-        if (menuRes.rows.length === 0) {
-            return res.status(400).json({ success: false, error: { code: 'NO_MENU', message: 'No menu items found' } });
+        // Fetch combos for this restaurant
+        const comboRes = await query(
+            'SELECT id, name, combo_price, original_price FROM combos WHERE restaurant_id = $1 AND is_active = true',
+            [restaurantId]
+        );
+
+        if (menuRes.rows.length === 0 && comboRes.rows.length === 0) {
+            return res.status(400).json({ success: false, error: { code: 'NO_MENU', message: 'No menu items or combos found' } });
         }
 
         // Resolve item names to IDs (case-insensitive fuzzy match)
@@ -377,14 +383,35 @@ router.post('/voice-order', authMiddleware, async (req, res) => {
 
         for (const orderItem of items) {
             const nameLower = (orderItem.name || '').toLowerCase().trim();
-            let match = menuRes.rows.find(mi => mi.name.toLowerCase() === nameLower);
-            if (!match) {
-                // partial match
-                match = menuRes.rows.find(mi => mi.name.toLowerCase().includes(nameLower) || nameLower.includes(mi.name.toLowerCase()));
+
+            // Try matching menu item first
+            let menuMatch = menuRes.rows.find(mi => mi.name.toLowerCase() === nameLower);
+            if (!menuMatch) {
+                menuMatch = menuRes.rows.find(mi => mi.name.toLowerCase().includes(nameLower) || nameLower.includes(mi.name.toLowerCase()));
             }
-            if (match) {
+
+            // If not found in menu items, try matching combos
+            let comboMatch = null;
+            if (!menuMatch) {
+                comboMatch = comboRes.rows.find(c => c.name.toLowerCase() === nameLower);
+                if (!comboMatch) {
+                    comboMatch = comboRes.rows.find(c => c.name.toLowerCase().includes(nameLower) || nameLower.includes(c.name.toLowerCase()));
+                }
+            }
+
+            if (menuMatch) {
                 resolvedItems.push({
-                    menuItemId: match.id,
+                    type: 'menu_item',
+                    id: menuMatch.id,
+                    match: menuMatch,
+                    quantity: orderItem.quantity || 1,
+                    isUpsell: false,
+                });
+            } else if (comboMatch) {
+                resolvedItems.push({
+                    type: 'combo',
+                    id: comboMatch.id,
+                    match: comboMatch,
                     quantity: orderItem.quantity || 1,
                     isUpsell: false,
                 });
@@ -406,27 +433,47 @@ router.post('/voice-order', authMiddleware, async (req, res) => {
         const orderItems = [];
 
         for (const ri of resolvedItems) {
-            const mi = menuRes.rows.find(m => m.id === ri.menuItemId);
-            const totalPrice = parseFloat(mi.price) * ri.quantity;
+            let totalPrice = 0;
+            let unitPrice = 0;
+            let itemName = '';
+
+            if (ri.type === 'menu_item') {
+                unitPrice = parseFloat(ri.match.price);
+                totalPrice = unitPrice * ri.quantity;
+                itemName = ri.match.name;
+                orderItems.push({
+                    menuItemId: ri.id,
+                    comboId: null,
+                    itemName: itemName,
+                    quantity: ri.quantity,
+                    unitPrice: unitPrice,
+                    totalPrice,
+                    isUpsell: false,
+                });
+            } else {
+                unitPrice = parseFloat(ri.match.combo_price);
+                totalPrice = unitPrice * ri.quantity;
+                itemName = ri.match.name;
+                orderItems.push({
+                    menuItemId: null,
+                    comboId: ri.id,
+                    itemName: itemName,
+                    quantity: ri.quantity,
+                    unitPrice: unitPrice,
+                    totalPrice,
+                    isUpsell: false,
+                });
+            }
             subtotal += totalPrice;
-            orderItems.push({
-                menuItemId: mi.id,
-                comboId: null,
-                itemName: mi.name,
-                quantity: ri.quantity,
-                unitPrice: parseFloat(mi.price),
-                totalPrice,
-                isUpsell: false,
-            });
         }
 
         const tax = subtotal * 0.05;
         const total = subtotal + tax;
 
-        // Insert order
+        // Insert order with status 'delivered'
         const orderResult = await query(
-            `INSERT INTO orders (user_id, restaurant_id, order_number, subtotal, tax, total, ordered_via, ai_upsell_accepted)
-             VALUES ($1, $2, $3, $4, $5, $6, 'voice', false) RETURNING *`,
+            `INSERT INTO orders (user_id, restaurant_id, order_number, status, subtotal, tax, total, ordered_via, ai_upsell_accepted)
+             VALUES ($1, $2, $3, 'delivered', $4, $5, $6, 'voice', false) RETURNING *`,
             [req.user.id, restaurantId, orderNumber, subtotal.toFixed(2), tax.toFixed(2), total.toFixed(2)]
         );
         const order = orderResult.rows[0];
@@ -436,29 +483,37 @@ router.post('/voice-order', authMiddleware, async (req, res) => {
             await query(
                 `INSERT INTO order_items (order_id, menu_item_id, combo_id, item_name, quantity, unit_price, total_price, is_upsell)
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                [order.id, item.menuItemId, null, item.itemName, item.quantity, item.unitPrice, item.totalPrice, false]
+                [order.id, item.menuItemId, item.comboId, item.itemName, item.quantity, item.unitPrice, item.totalPrice, false]
             );
 
-            // Update menu_items sales
-            await query(
-                `UPDATE menu_items SET total_sales = total_sales + $1::integer, total_revenue = total_revenue + $2::numeric WHERE id = $3`,
-                [item.quantity, item.totalPrice, item.menuItemId]
-            );
+            if (item.menuItemId) {
+                // Update menu_items sales
+                await query(
+                    `UPDATE menu_items SET total_sales = total_sales + $1::integer, total_revenue = total_revenue + $2::numeric WHERE id = $3`,
+                    [item.quantity, item.totalPrice, item.menuItemId]
+                );
 
-            // Update daily_sales
-            await query(
-                `INSERT INTO daily_sales (restaurant_id, menu_item_id, sale_date, quantity_sold, revenue, cost, profit)
-                 VALUES ($1, $2, CURRENT_DATE, $3::integer, $4::numeric,
-                   (SELECT cost_price * $3::integer FROM menu_items WHERE id = $2),
-                   $4::numeric - (SELECT cost_price * $3::integer FROM menu_items WHERE id = $2))
-                 ON CONFLICT (restaurant_id, menu_item_id, sale_date)
-                 DO UPDATE SET
-                   quantity_sold = daily_sales.quantity_sold + $3::integer,
-                   revenue = daily_sales.revenue + $4::numeric,
-                   cost = daily_sales.cost + (SELECT cost_price * $3::integer FROM menu_items WHERE id = $2),
-                   profit = daily_sales.profit + ($4::numeric - (SELECT cost_price * $3::integer FROM menu_items WHERE id = $2))`,
-                [restaurantId, item.menuItemId, item.quantity, item.totalPrice]
-            );
+                // Update daily_sales
+                await query(
+                    `INSERT INTO daily_sales (restaurant_id, menu_item_id, sale_date, quantity_sold, revenue, cost, profit)
+                     VALUES ($1, $2, CURRENT_DATE, $3::integer, $4::numeric,
+                       (SELECT cost_price * $3::integer FROM menu_items WHERE id = $2),
+                       $4::numeric - (SELECT cost_price * $3::integer FROM menu_items WHERE id = $2))
+                     ON CONFLICT (restaurant_id, menu_item_id, sale_date)
+                     DO UPDATE SET
+                       quantity_sold = daily_sales.quantity_sold + $3::integer,
+                       revenue = daily_sales.revenue + $4::numeric,
+                       cost = daily_sales.cost + (SELECT cost_price * $3::integer FROM menu_items WHERE id = $2),
+                       profit = daily_sales.profit + ($4::numeric - (SELECT cost_price * $3::integer FROM menu_items WHERE id = $2))`,
+                    [restaurantId, item.menuItemId, item.quantity, item.totalPrice]
+                );
+            } else if (item.comboId) {
+                // Update combo sales
+                await query(
+                    'UPDATE combos SET total_sales = total_sales + $1::integer WHERE id = $2',
+                    [item.quantity, item.comboId]
+                );
+            }
         }
 
         // Update restaurant stats
