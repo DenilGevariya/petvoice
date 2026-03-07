@@ -61,9 +61,9 @@ export default function RegisterPage() {
             <div className="auth-left">
                 <form className="auth-form animate-fade-in-up" onSubmit={handleSubmit}>
                     <div className="auth-form-header">
-                        <div className="auth-form-logo">R</div>
+                        <div className="auth-form-logo">P</div>
                         <h1>Create Account</h1>
-                        <p>Join RestroBrain — The future of restaurant ordering</p>
+                        <p>Join PetVoice — The future of restaurant ordering</p>
                     </div>
 
                     <div className="auth-role-selector">

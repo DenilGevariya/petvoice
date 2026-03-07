@@ -53,9 +53,9 @@ export default function OwnerLayout({ children }) {
 
             <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
                 <div className="sidebar-header">
-                    <div className="sidebar-logo">R</div>
+                    <div className="sidebar-logo">P</div>
                     <div className="sidebar-brand">
-                        <h1>RestroBrain</h1>
+                        <h1>PetVoice</h1>
                         <p>Restaurant Intelligence</p>
                     </div>
                 </div>

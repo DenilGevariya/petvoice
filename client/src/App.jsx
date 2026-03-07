@@ -43,7 +43,7 @@ function AppRoutes() {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 16 }}>
         <div className="animate-float" style={{ fontSize: 56 }}>🍽️</div>
-        <p style={{ color: 'var(--neutral-500)', fontSize: 14 }}>Loading RestroBrain...</p>
+        <p style={{ color: 'var(--neutral-500)', fontSize: 14 }}>Loading PetVoice...</p>
       </div>
     );
   }

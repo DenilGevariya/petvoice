@@ -1,6 +1,6 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-const getToken = () => localStorage.getItem('restrobrain_token');
+const getToken = () => localStorage.getItem('petvoice_token');
 
 const apiRequest = async (endpoint, options = {}) => {
     const token = getToken();

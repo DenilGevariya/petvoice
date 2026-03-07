@@ -34,9 +34,9 @@ export default function LoginPage() {
             <div className="auth-left">
                 <form className="auth-form animate-fade-in-up" onSubmit={handleSubmit}>
                     <div className="auth-form-header">
-                        <div className="auth-form-logo">R</div>
+                        <div className="auth-form-logo">P</div>
                         <h1>Welcome Back</h1>
-                        <p>Sign in to your RestroBrain account</p>
+                        <p>Sign in to your PetVoice account</p>
                     </div>
 
                     <div className="form-group">
