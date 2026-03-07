@@ -39,7 +39,7 @@ router.post('/image', authMiddleware, upload.single('image'), async (req, res) =
         const result = await new Promise((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
                 {
-                    folder: 'petvoice/menu-items',
+                    folder: 'restrobrain/menu-items',
                     transformation: [
                         { width: 800, height: 600, crop: 'limit', quality: 'auto', format: 'webp' }
                     ],

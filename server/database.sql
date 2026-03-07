@@ -1,10 +1,11 @@
 -- =====================================================
--- PetVoice - AI Restaurant Ordering & Revenue Platform
+-- RestroBrain - AI Restaurant Ordering & Revenue Platform
 -- Database Schema - Run this in pgAdmin
 -- =====================================================
 
 -- Create Database (run this separately if needed)
--- CREATE DATABASE petvoice;
+-- CREATE DATABASE restrobrain;
+
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -254,4 +255,4 @@ FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 -- then the seed data below can be used for testing analytics.
 -- The actual data will be populated through the application.
 
-SELECT 'PetVoice Database Schema Created Successfully!' AS status;
+SELECT 'RestroBrain Database Schema Created Successfully!' AS status;

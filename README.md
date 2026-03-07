@@ -1,9 +1,9 @@
-# 🎙️ PetVoice (AI-Powered Restaurant Ordering & Revenue Platform)
+# 🎙️ RestroBrain (AI-Powered Restaurant Ordering & Revenue Platform)
 
-![PetVoice Banner](https://via.placeholder.com/1200x400/0f172a/ffffff?text=PetVoice+AI+-+Restaurant+Ordering+Reimagined)
+![RestroBrain Banner](https://via.placeholder.com/1200x400/0f172a/ffffff?text=RestroBrain+AI+-+Restaurant+Ordering+Reimagined)
 
 ## 📖 Project Overview
-**PetVoice** is a next-generation AI-powered restaurant ordering and revenue intelligence platform. Designed to bridge the gap between seamless customer ordering and deep merchant analytics, PetVoice leverages **Gemini 2.0 Flash** and **Vapi** to create state-of-the-art voice ordering assistants. For restaurant owners, it functions as a comprehensive co-pilot, surfacing actionable insights on menu performance, intelligent pricing optimization, and market basket combinations.
+**RestroBrain** is a next-generation AI-powered restaurant ordering and revenue intelligence platform. Designed to bridge the gap between seamless customer ordering and deep merchant analytics, RestroBrain leverages **Gemini 2.0 Flash** and **Vapi** to create state-of-the-art voice ordering assistants. For restaurant owners, it functions as a comprehensive co-pilot, surfacing actionable insights on menu performance, intelligent pricing optimization, and market basket combinations.
 
 ## 🚨 Problem Statement
 1. **Inefficient Ordering & Lost Upsell Opportunities:** Traditional online ordering relies heavily on manual touch-based UI navigating through dozens of nested menus. Staff-taken orders are prone to human error and frequently miss critical upselling opportunities.
@@ -11,7 +11,7 @@
 3. **Menu Optimization Guesswork:** Without understanding "what is bought together" or classifying items as *Stars, Workhorses, Puzzles, or Dogs*, owners bleed potential revenue.
 
 ## 💡 Solution
-PetVoice transforms the restaurant ecosystem by introducing:
+RestroBrain transforms the restaurant ecosystem by introducing:
 - **For Customers:** A real-time, zero-latency **Voice Ordering AI** that understands natural language, context, quantities, and dietary preferences. It automatically places the order securely into the restaurant’s POS backend.
 - **For Owners:** An advanced **Revenue Intelligence Dashboard** that analyzes every transaction, tracks item co-purchases (market basket analysis), classifies menu performance, and provides automated, AI-driven price optimization suggestions (increase, decrease, promote, or keep).
 
@@ -71,7 +71,7 @@ PetVoice transforms the restaurant ecosystem by introducing:
 ## 📂 Project Structure
 
 ```text
-petvoice/
+RestroBrain/
 ├── client/                 # React 19 Frontend
 │   ├── src/
 │   │   ├── components/     # Reusable UI elements (Charts, Buttons, Layouts)
@@ -104,8 +104,8 @@ petvoice/
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-username/petvoice.git
-cd petvoice
+git clone https://github.com/your-username/RestroBrain.git
+cd RestroBrain
 ```
 
 ### 2. Database Setup

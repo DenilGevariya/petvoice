@@ -230,7 +230,7 @@ RULES:
                     provider: '11labs',
                     voiceId: 'sarah',
                 },
-                name: `PetVoice Order - ${selectedRestaurant.name}`,
+                name: `RestroBrain Order - ${selectedRestaurant.name}`,
                 firstMessage: `Hello! Welcome to ${selectedRestaurant.name}. I'm your AI ordering assistant. What would you like to order today?`,
             });
 
@@ -318,9 +318,9 @@ RULES:
             {/* Header */}
             <div className="vo-header">
                 <div className="vo-header-left">
-                    <div className="vo-logo">P</div>
+                    <div className="vo-logo">R</div>
                     <div>
-                        <h1>PetVoice AI</h1>
+                        <h1>RestroBrain AI</h1>
                         <p>Voice Ordering</p>
                     </div>
                 </div>

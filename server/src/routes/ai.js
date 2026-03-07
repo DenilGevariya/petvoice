@@ -239,7 +239,7 @@ router.get('/greeting', authMiddleware, async (req, res) => {
 
         const greetings = {
             en: {
-                title: 'Hello! Welcome to PetVoice AI Ordering',
+                title: 'Hello! Welcome to RestroBrain AI Ordering',
                 subtitle: 'Your intelligent food ordering assistant',
                 hint: 'Try saying: "I want a burger from Food Hub" or "Order a pizza from Pizza Palace"',
                 examples: [
@@ -249,7 +249,7 @@ router.get('/greeting', authMiddleware, async (req, res) => {
                 ]
             },
             hi: {
-                title: 'नमस्ते! PetVoice AI ऑर्डरिंग में आपका स्वागत है',
+                title: 'नमस्ते! RestroBrain AI ऑर्डरिंग में आपका स्वागत है',
                 subtitle: 'आपका बुद्धिमान फूड ऑर्डरिंग सहायक',
                 hint: 'कहकर देखें: "मुझे Food Hub से बर्गर चाहिए" या "Pizza Palace से पिज़्ज़ा ऑर्डर करो"',
                 examples: [
@@ -259,7 +259,7 @@ router.get('/greeting', authMiddleware, async (req, res) => {
                 ]
             },
             gu: {
-                title: 'નમસ્તે! PetVoice AI ઓર્ડરિંગમાં આપનું સ્વાગત છે',
+                title: 'નમસ્તે! RestroBrain AI ઓર્ડરિંગમાં આપનું સ્વાગત છે',
                 subtitle: 'તમારા બુદ્ધિશાળી ફૂડ ઓર્ડરિંગ સહાયક',
                 hint: 'કહો: "મને Food Hub માંથી બર્ગર જોઈએ છે"',
                 examples: [

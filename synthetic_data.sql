@@ -1,5 +1,5 @@
 -- =========================================================================
--- PetVoice - Synthetic Order Data Generator (All Restaurants)
+-- RestroBrain - Synthetic Order Data Generator (All Restaurants)
 -- Compatible with Neon PostgreSQL
 -- Instructions: Copy and paste this script into your Neon SQL editor and run it.
 -- It will automatically find ALL restaurants, populate their menus (if empty),

@@ -12,7 +12,7 @@ export function AuthProvider({ children }) {
     }, []);
 
     const checkAuth = async () => {
-        const token = localStorage.getItem('petvoice_token');
+        const token = localStorage.getItem('restrobrain_token');
         if (!token) {
             setLoading(false);
             return;
@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
             const res = await api.getMe();
             setUser(res.data);
         } catch {
-            localStorage.removeItem('petvoice_token');
+            localStorage.removeItem('restrobrain_token');
         } finally {
             setLoading(false);
         }
@@ -29,20 +29,20 @@ export function AuthProvider({ children }) {
 
     const login = async (email, password) => {
         const res = await api.login({ email, password });
-        localStorage.setItem('petvoice_token', res.data.token);
+        localStorage.setItem('restrobrain_token', res.data.token);
         setUser(res.data.user);
         return res.data.user;
     };
 
     const register = async (data) => {
         const res = await api.register(data);
-        localStorage.setItem('petvoice_token', res.data.token);
+        localStorage.setItem('restrobrain_token', res.data.token);
         setUser(res.data.user);
         return res.data.user;
     };
 
     const logout = () => {
-        localStorage.removeItem('petvoice_token');
+        localStorage.removeItem('restrobrain_token');
         setUser(null);
     };
 

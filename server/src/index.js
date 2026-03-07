@@ -20,7 +20,7 @@ app.use(cors({
         'http://localhost:5173',
         'http://localhost:5174',
         'http://localhost:3000',
-        'https://petvoice.vercel.app',
+        'https://restrobrain.vercel.app',
         process.env.FRONTEND_URL
     ].filter(Boolean),
     credentials: true,
@@ -48,7 +48,7 @@ app.use('/api/upload', uploadRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-    res.json({ success: true, message: 'PetVoice API is running', timestamp: new Date().toISOString() });
+    res.json({ success: true, message: 'RestroBrain API is running', timestamp: new Date().toISOString() });
 });
 
 // 404 handler
@@ -72,7 +72,7 @@ app.listen(PORT, () => {
     console.log(`
   ╔══════════════════════════════════════════════╗
   ║                                              ║
-  ║   🍽️  PetVoice API Server                    ║
+  ║   🍽️  RestroBrain API Server                 ║
   ║   Running on http://localhost:${PORT}           ║
   ║   Environment: ${process.env.NODE_ENV || 'development'}              ║
   ║                                              ║
