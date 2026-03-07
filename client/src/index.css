@@ -2796,3 +2796,459 @@ img {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================
+   VOICE ORDER — Vapi AI Interface
+   ============================================ */
+
+.vo-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--neutral-50);
+}
+
+.vo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: var(--white);
+  border-bottom: 1px solid var(--neutral-100);
+}
+
+.vo-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vo-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--gradient-brand);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.vo-header h1 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--neutral-800);
+}
+
+.vo-header p {
+  font-size: 11px;
+  color: var(--neutral-400);
+}
+
+.vo-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ─── Sidebar ─── */
+
+.vo-sidebar {
+  width: 280px;
+  background: var(--white);
+  border-right: 1px solid var(--neutral-100);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.vo-sidebar-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--neutral-400);
+  letter-spacing: 0.04em;
+  padding: 16px 16px 8px;
+}
+
+.vo-restaurant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 8px;
+}
+
+.vo-restaurant-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.vo-restaurant-item:hover {
+  background: var(--neutral-50);
+}
+
+.vo-restaurant-item--active {
+  background: var(--brand-50);
+}
+
+.vo-restaurant-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--gradient-brand);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.vo-restaurant-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--neutral-800);
+}
+
+.vo-restaurant-meta {
+  font-size: 11px;
+  color: var(--neutral-400);
+}
+
+.vo-menu-preview {
+  border-top: 1px solid var(--neutral-100);
+  margin-top: auto;
+}
+
+.vo-menu-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 16px 16px;
+}
+
+.vo-menu-chip {
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--neutral-50);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--neutral-600);
+}
+
+.vo-menu-chip span {
+  color: var(--success-600);
+  margin-left: 4px;
+}
+
+/* ─── Main ─── */
+
+.vo-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.vo-transcripts {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vo-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--neutral-300);
+  gap: 10px;
+}
+
+.vo-empty-state h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--neutral-600);
+}
+
+.vo-empty-state p {
+  font-size: 13px;
+  color: var(--neutral-400);
+  max-width: 320px;
+}
+
+.vo-msg {
+  display: flex;
+  gap: 10px;
+  max-width: 80%;
+}
+
+.vo-msg--user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.vo-msg--system {
+  align-self: center;
+  max-width: 100%;
+}
+
+.vo-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.vo-msg-avatar--user {
+  background: var(--brand-100);
+  color: var(--brand-700);
+  font-weight: 700;
+}
+
+.vo-msg-avatar--assistant {
+  background: var(--neutral-100);
+}
+
+.vo-msg-avatar--system {
+  background: none;
+  width: 0;
+  height: 0;
+}
+
+.vo-msg-bubble {
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.vo-msg--user .vo-msg-bubble {
+  background: var(--brand-600);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.vo-msg--assistant .vo-msg-bubble {
+  background: var(--neutral-100);
+  color: var(--neutral-800);
+  border-bottom-left-radius: 4px;
+}
+
+.vo-msg--system .vo-msg-bubble {
+  background: var(--neutral-50);
+  color: var(--neutral-500);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  padding: 6px 16px;
+}
+
+.vo-msg-role {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--neutral-400);
+  margin-bottom: 2px;
+}
+
+.vo-msg--user .vo-msg-role {
+  color: var(--brand-200);
+  text-align: right;
+}
+
+.vo-msg-text {
+  white-space: pre-wrap;
+}
+
+/* ─── Order Card ─── */
+
+.vo-order-card {
+  margin: 0 24px;
+  padding: 16px;
+  background: var(--white);
+  border: 2px solid var(--success-200);
+  border-radius: var(--radius-lg);
+}
+
+.vo-order-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--neutral-800);
+  margin-bottom: 8px;
+}
+
+.vo-order-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.vo-order-item {
+  font-size: 14px;
+  color: var(--neutral-700);
+  padding: 4px 0;
+  border-bottom: 1px solid var(--neutral-50);
+}
+
+.vo-order-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ─── Controls ─── */
+
+.vo-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 24px;
+  background: var(--white);
+  border-top: 1px solid var(--neutral-100);
+}
+
+.vo-mic-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 28px;
+  border-radius: var(--radius-full);
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.vo-mic-btn:hover:not(:disabled) {
+  transform: scale(1.03);
+}
+
+.vo-mic-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vo-mic-btn--start {
+  background: var(--gradient-brand);
+  color: white;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+}
+
+.vo-mic-btn--connecting {
+  background: var(--neutral-200);
+  color: var(--neutral-600);
+}
+
+.vo-mic-btn--active {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+  animation: vo-glow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes vo-glow {
+  from {
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+  }
+
+  to {
+    box-shadow: 0 4px 30px rgba(239, 68, 68, 0.6);
+  }
+}
+
+.vo-pulse {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--neutral-400);
+  animation: vo-pulse-anim 1s ease-in-out infinite;
+}
+
+@keyframes vo-pulse-anim {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.4);
+    opacity: 0.4;
+  }
+}
+
+.vo-live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--error-500);
+}
+
+.vo-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--error-500);
+  animation: vo-pulse-anim 1s ease-in-out infinite;
+}
+
+@media (max-width: 768px) {
+  .vo-body {
+    flex-direction: column;
+  }
+
+  .vo-sidebar {
+    width: 100%;
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--neutral-100);
+  }
+
+  .vo-restaurant-list {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0 8px 8px;
+  }
+
+  .vo-restaurant-item {
+    flex-shrink: 0;
+  }
+
+  .vo-menu-preview {
+    display: none;
+  }
+
+  .vo-msg {
+    max-width: 90%;
+  }
+}

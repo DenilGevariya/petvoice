@@ -55,6 +55,7 @@ export const api = {
 
     // Orders
     createOrder: (body) => apiRequest('/orders', { method: 'POST', body: JSON.stringify(body) }),
+    voiceOrder: (body) => apiRequest('/orders/voice-order', { method: 'POST', body: JSON.stringify(body) }),
     getMyOrders: () => apiRequest('/orders/my-orders'),
     getRestaurantOrders: (restaurantId, params) => {
         const query = params ? '?' + new URLSearchParams(params).toString() : '';

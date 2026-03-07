@@ -13,6 +13,7 @@ import Recommendations from './pages/owner/Recommendations';
 import PriceOptimization from './pages/owner/PriceOptimization';
 import Suggestions from './pages/owner/Suggestions';
 import VoiceCopilot from './pages/customer/VoiceCopilot';
+import VoiceOrder from './pages/customer/VoiceOrder';
 import OrderHistory from './pages/customer/OrderHistory';
 import SetupRestaurant from './pages/owner/SetupRestaurant';
 import './index.css';
@@ -66,6 +67,7 @@ function AppRoutes() {
       <Route path="/owner/setup" element={<ProtectedRoute role="owner"><SetupRestaurant /></ProtectedRoute>} />
       {/* Customer Routes */}
       <Route path="/order" element={<ProtectedRoute role="customer"><VoiceCopilot /></ProtectedRoute>} />
+      <Route path="/voice-order" element={<ProtectedRoute role="customer"><VoiceOrder /></ProtectedRoute>} />
       <Route path="/order-history" element={<ProtectedRoute role="customer"><OrderHistory /></ProtectedRoute>} />
 
       {/* Default */}

@@ -348,4 +348,159 @@ async function updateClassifications(restaurantId) {
     }
 }
 
+// Voice order — accepts item names (from Vapi AI), resolves to menu_item IDs, creates order
+router.post('/voice-order', authMiddleware, async (req, res) => {
+    try {
+        const { restaurantId, items } = req.body;
+        // items = [{ name: "Veg Burger", quantity: 2 }, ...]
+
+        if (!restaurantId || !items || items.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: { code: 'VALIDATION_ERROR', message: 'Restaurant and items are required' }
+            });
+        }
+
+        // Fetch all menu items for this restaurant
+        const menuRes = await query(
+            'SELECT id, name, price, cost_price FROM menu_items WHERE restaurant_id = $1 AND is_available = true',
+            [restaurantId]
+        );
+
+        if (menuRes.rows.length === 0) {
+            return res.status(400).json({ success: false, error: { code: 'NO_MENU', message: 'No menu items found' } });
+        }
+
+        // Resolve item names to IDs (case-insensitive fuzzy match)
+        const resolvedItems = [];
+        const notFound = [];
+
+        for (const orderItem of items) {
+            const nameLower = (orderItem.name || '').toLowerCase().trim();
+            let match = menuRes.rows.find(mi => mi.name.toLowerCase() === nameLower);
+            if (!match) {
+                // partial match
+                match = menuRes.rows.find(mi => mi.name.toLowerCase().includes(nameLower) || nameLower.includes(mi.name.toLowerCase()));
+            }
+            if (match) {
+                resolvedItems.push({
+                    menuItemId: match.id,
+                    quantity: orderItem.quantity || 1,
+                    isUpsell: false,
+                });
+            } else {
+                notFound.push(orderItem.name);
+            }
+        }
+
+        if (resolvedItems.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: { code: 'NO_MATCH', message: `Could not find menu items: ${notFound.join(', ')}` }
+            });
+        }
+
+        // Compute totals
+        const orderNumber = 'ORD-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();
+        let subtotal = 0;
+        const orderItems = [];
+
+        for (const ri of resolvedItems) {
+            const mi = menuRes.rows.find(m => m.id === ri.menuItemId);
+            const totalPrice = parseFloat(mi.price) * ri.quantity;
+            subtotal += totalPrice;
+            orderItems.push({
+                menuItemId: mi.id,
+                comboId: null,
+                itemName: mi.name,
+                quantity: ri.quantity,
+                unitPrice: parseFloat(mi.price),
+                totalPrice,
+                isUpsell: false,
+            });
+        }
+
+        const tax = subtotal * 0.05;
+        const total = subtotal + tax;
+
+        // Insert order
+        const orderResult = await query(
+            `INSERT INTO orders (user_id, restaurant_id, order_number, subtotal, tax, total, ordered_via, ai_upsell_accepted)
+             VALUES ($1, $2, $3, $4, $5, $6, 'voice', false) RETURNING *`,
+            [req.user.id, restaurantId, orderNumber, subtotal.toFixed(2), tax.toFixed(2), total.toFixed(2)]
+        );
+        const order = orderResult.rows[0];
+
+        // Insert order items + update POS
+        for (const item of orderItems) {
+            await query(
+                `INSERT INTO order_items (order_id, menu_item_id, combo_id, item_name, quantity, unit_price, total_price, is_upsell)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                [order.id, item.menuItemId, null, item.itemName, item.quantity, item.unitPrice, item.totalPrice, false]
+            );
+
+            // Update menu_items sales
+            await query(
+                `UPDATE menu_items SET total_sales = total_sales + $1::integer, total_revenue = total_revenue + $2::numeric WHERE id = $3`,
+                [item.quantity, item.totalPrice, item.menuItemId]
+            );
+
+            // Update daily_sales
+            await query(
+                `INSERT INTO daily_sales (restaurant_id, menu_item_id, sale_date, quantity_sold, revenue, cost, profit)
+                 VALUES ($1, $2, CURRENT_DATE, $3::integer, $4::numeric,
+                   (SELECT cost_price * $3::integer FROM menu_items WHERE id = $2),
+                   $4::numeric - (SELECT cost_price * $3::integer FROM menu_items WHERE id = $2))
+                 ON CONFLICT (restaurant_id, menu_item_id, sale_date)
+                 DO UPDATE SET
+                   quantity_sold = daily_sales.quantity_sold + $3::integer,
+                   revenue = daily_sales.revenue + $4::numeric,
+                   cost = daily_sales.cost + (SELECT cost_price * $3::integer FROM menu_items WHERE id = $2),
+                   profit = daily_sales.profit + ($4::numeric - (SELECT cost_price * $3::integer FROM menu_items WHERE id = $2))`,
+                [restaurantId, item.menuItemId, item.quantity, item.totalPrice]
+            );
+        }
+
+        // Update restaurant stats
+        await query(
+            `UPDATE restaurants SET total_orders = total_orders + 1, total_revenue = total_revenue + $1::numeric WHERE id = $2`,
+            [total, restaurantId]
+        );
+
+        // Update co-purchases
+        const menuItemIds = Array.from(new Set(orderItems.map(i => i.menuItemId)));
+        for (let i = 0; i < menuItemIds.length; i++) {
+            for (let j = i + 1; j < menuItemIds.length; j++) {
+                const [itemA, itemB] = [menuItemIds[i], menuItemIds[j]].sort();
+                await query(
+                    `INSERT INTO item_co_purchases (restaurant_id, item_a_id, item_b_id, co_purchase_count)
+                     VALUES ($1, $2, $3, 1)
+                     ON CONFLICT (restaurant_id, item_a_id, item_b_id)
+                     DO UPDATE SET co_purchase_count = item_co_purchases.co_purchase_count + 1, updated_at = NOW()`,
+                    [restaurantId, itemA, itemB]
+                );
+            }
+        }
+
+        // Update classifications
+        await updateClassifications(restaurantId);
+
+        res.status(201).json({
+            success: true,
+            data: {
+                id: order.id,
+                orderNumber: order.order_number,
+                subtotal: parseFloat(order.subtotal),
+                tax: parseFloat(order.tax),
+                total: parseFloat(order.total),
+                items: orderItems,
+                notFound,
+            }
+        });
+    } catch (error) {
+        console.error('Voice order error:', error);
+        res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+    }
+});
+
 module.exports = router;
