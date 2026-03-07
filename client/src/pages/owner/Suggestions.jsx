@@ -237,18 +237,17 @@ export default function Suggestions() {
         const key = `bogo-${item.menuItemId}`;
         setActionLoading(prev => ({ ...prev, [key]: true }));
         try {
-            // BOGO = effectively 50% off → set price to half for the promo
-            const bogoPrice = Math.round(item.price * 0.5);
             await api.updateMenuItem(item.menuItemId, {
                 name: item.name,
-                price: bogoPrice,
+                price: item.price,
                 costPrice: item.costPrice,
                 isAvailable: true,
                 isVeg: item.isVeg ?? false,
-                isBestseller: true, // highlight as promo
+                isBestseller: true,
+                isBogo: true, // Mark as BOGO
                 imageUrl: item.imageUrl,
             });
-            toast.success(`BOGO applied! "${item.name}" price set to ₹${bogoPrice}`);
+            toast.success(`BOGO applied for "${item.name}"!`);
             setBogoSuggestions(prev => prev.filter(i => i.menuItemId !== item.menuItemId));
         } catch (err) {
             toast.error(err.message);

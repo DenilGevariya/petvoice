@@ -98,10 +98,10 @@ router.post('/', authMiddleware, ownerMiddleware, async (req, res) => {
         }
 
         const result = await query(
-            `INSERT INTO menu_items (restaurant_id, category_id, name, description, price, cost_price, is_available, is_veg, is_bestseller, spice_level, preparation_time, image_url)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            `INSERT INTO menu_items (restaurant_id, category_id, name, description, price, cost_price, is_available, is_veg, is_bestseller, spice_level, preparation_time, image_url, is_bogo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
-            [restaurantId, categoryId || null, name, description || null, price, costPrice || 0, isAvailable !== false, isVeg || false, isBestseller || false, spiceLevel || 0, preparationTime || 15, imageUrl || null]
+            [restaurantId, categoryId || null, name, description || null, price, costPrice || 0, isAvailable !== false, isVeg || false, isBestseller || false, spiceLevel || 0, preparationTime || 15, imageUrl || null, req.body.isBogo || false]
         );
 
         res.status(201).json({ success: true, data: formatMenuItem(result.rows[0]) });
@@ -141,8 +141,9 @@ router.put('/:id', authMiddleware, ownerMiddleware, async (req, res) => {
             spice_level = $9,
             preparation_time = $10,
             image_url = $11,
+            is_bogo = $12,
             updated_at = NOW()
-       WHERE id = $12
+       WHERE id = $13
        RETURNING *`,
             [
                 name,
@@ -156,6 +157,7 @@ router.put('/:id', authMiddleware, ownerMiddleware, async (req, res) => {
                 spiceLevel || 0,
                 preparationTime || 15,
                 imageUrl || null,
+                req.body.isBogo !== undefined ? req.body.isBogo : false,
                 req.params.id
             ]
         );
@@ -266,6 +268,84 @@ router.post('/combos', authMiddleware, ownerMiddleware, async (req, res) => {
     }
 });
 
+// Update combo
+router.put('/combos/:id', authMiddleware, ownerMiddleware, async (req, res) => {
+    try {
+        const { name, description, comboPrice, items } = req.body;
+
+        const comboCheck = await query(
+            `SELECT c.id FROM combos c
+             JOIN restaurants r ON c.restaurant_id = r.id
+             WHERE c.id = $1 AND r.owner_id = $2`,
+            [req.params.id, req.user.id]
+        );
+
+        if (comboCheck.rows.length === 0) {
+            return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Not authorized' } });
+        }
+
+        // Calculate original price
+        let originalPrice = 0;
+        for (const item of items) {
+            const menuItem = await query('SELECT price FROM menu_items WHERE id = $1', [item.menuItemId]);
+            if (menuItem.rows.length > 0) {
+                originalPrice += parseFloat(menuItem.rows[0].price) * (item.quantity || 1);
+            }
+        }
+
+        const discountPercentage = originalPrice > 0 ? ((originalPrice - comboPrice) / originalPrice * 100) : 0;
+
+        const comboResult = await query(
+            `UPDATE combos SET name = $1, description = $2, combo_price = $3, original_price = $4, discount_percentage = $5, updated_at = NOW() WHERE id = $6 RETURNING *`,
+            [name, description || null, comboPrice, originalPrice, discountPercentage.toFixed(2), req.params.id]
+        );
+
+        // Update items
+        await query('DELETE FROM combo_items WHERE combo_id = $1', [req.params.id]);
+
+        for (const item of items) {
+            await query(
+                'INSERT INTO combo_items (combo_id, menu_item_id, quantity) VALUES ($1, $2, $3)',
+                [req.params.id, item.menuItemId, item.quantity || 1]
+            );
+        }
+
+        const combo = comboResult.rows[0];
+        const returnItems = await query(
+            `SELECT ci.quantity, mi.id, mi.name, mi.price 
+             FROM combo_items ci JOIN menu_items mi ON ci.menu_item_id = mi.id 
+             WHERE ci.combo_id = $1`, [combo.id]
+        );
+
+        res.json({ success: true, data: { ...formatCombo(combo), items: returnItems.rows } });
+    } catch (error) {
+        console.error('Update combo error:', error);
+        res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to update combo' } });
+    }
+});
+
+// Delete combo
+router.delete('/combos/:id', authMiddleware, ownerMiddleware, async (req, res) => {
+    try {
+        const comboCheck = await query(
+            `SELECT c.id FROM combos c
+             JOIN restaurants r ON c.restaurant_id = r.id
+             WHERE c.id = $1 AND r.owner_id = $2`,
+            [req.params.id, req.user.id]
+        );
+
+        if (comboCheck.rows.length === 0) {
+            return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Not authorized' } });
+        }
+
+        await query('DELETE FROM combos WHERE id = $1', [req.params.id]);
+        res.json({ success: true, data: { message: 'Combo deleted' } });
+    } catch (error) {
+        console.error('Delete combo error:', error);
+        res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to delete combo' } });
+    }
+});
+
 function formatCategory(c) {
     return {
         id: c.id,
@@ -299,6 +379,7 @@ function formatMenuItem(item) {
         avgDailySales: parseFloat(item.avg_daily_sales) || 0,
         popularityScore: parseFloat(item.popularity_score) || 0,
         classification: item.classification,
+        isBogo: item.is_bogo,
         contributionMargin: parseFloat(item.price) - parseFloat(item.cost_price),
         marginPercentage: parseFloat(item.price) > 0 ? (((parseFloat(item.price) - parseFloat(item.cost_price)) / parseFloat(item.price)) * 100).toFixed(1) : 0,
         createdAt: item.created_at,

@@ -52,6 +52,8 @@ export const api = {
     deleteMenuItem: (id) => apiRequest(`/menu/${id}`, { method: 'DELETE' }),
     getCombos: (restaurantId) => apiRequest(`/menu/combos/${restaurantId}`),
     createCombo: (body) => apiRequest('/menu/combos', { method: 'POST', body: JSON.stringify(body) }),
+    updateCombo: (id, body) => apiRequest(`/menu/combos/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    deleteCombo: (id) => apiRequest(`/menu/combos/${id}`, { method: 'DELETE' }),
 
     // Orders
     createOrder: (body) => apiRequest('/orders', { method: 'POST', body: JSON.stringify(body) }),
