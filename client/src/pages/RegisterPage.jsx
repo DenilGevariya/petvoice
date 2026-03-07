@@ -47,7 +47,7 @@ export default function RegisterPage() {
             if (user.role === 'owner') {
                 navigate('/owner/setup');
             } else {
-                navigate('/order');
+                navigate('/voice-order');
             }
         } catch (err) {
             toast.error(err.message || 'Registration failed');

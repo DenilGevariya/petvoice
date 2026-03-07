@@ -21,7 +21,7 @@ export default function LoginPage() {
         try {
             const user = await login(email, password);
             toast.success(`Welcome back, ${user.fullName}!`);
-            navigate(user.role === 'owner' ? '/owner/dashboard' : '/order');
+            navigate(user.role === 'owner' ? '/owner/dashboard' : '/voice-order');
         } catch (err) {
             toast.error(err.message || 'Login failed');
         } finally {

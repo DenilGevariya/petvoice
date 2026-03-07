@@ -50,7 +50,7 @@ export default function OrderHistory() {
                     </div>
                 </div>
                 <div className="flex gap-3">
-                    <button className="btn btn-primary" onClick={() => navigate('/order')}>
+                    <button className="btn btn-primary" onClick={() => navigate('/voice-order')}>
                         <HiOutlineMicrophone size={16} /> New Order
                     </button>
                     <button className="btn btn-ghost" onClick={() => { logout(); navigate('/login'); }}>
@@ -110,7 +110,7 @@ export default function OrderHistory() {
                         <div className="empty-state-icon">📦</div>
                         <h3>No orders yet</h3>
                         <p>Your order history will appear here after you place your first order.</p>
-                        <button className="btn btn-primary" onClick={() => navigate('/order')}>
+                        <button className="btn btn-primary" onClick={() => navigate('/voice-order')}>
                             <HiOutlineMicrophone size={16} /> Place an Order
                         </button>
                     </div>

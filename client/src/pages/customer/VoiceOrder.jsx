@@ -205,8 +205,13 @@ RULES:
             if (jsonMatch) {
                 const parsed = JSON.parse(jsonMatch[0]);
                 if (parsed.confirmed && Array.isArray(parsed.items) && parsed.items.length > 0) {
-                    setOrderResult(parsed);
-                    toast.success('Order detected! Review and confirm below.');
+                    // Auto end the call
+                    if (vapiRef.current) {
+                        try { vapiRef.current.stop(); } catch (e) { /* ignore */ }
+                    }
+                    setCallStatus('ended');
+                    // Auto place the order
+                    autoPlaceOrder(parsed);
                 }
             }
         } catch (e) {
@@ -214,27 +219,29 @@ RULES:
         }
     };
 
-    const confirmOrder = async () => {
-        if (!orderResult || !selectedRestaurant) return;
+    const autoPlaceOrder = async (parsedOrder) => {
+        if (!selectedRestaurant) return;
 
         setPlacingOrder(true);
+        setOrderResult(parsedOrder);
         try {
             const res = await api.voiceOrder({
                 restaurantId: selectedRestaurant.id,
-                items: orderResult.items,
+                items: parsedOrder.items,
             });
 
             toast.success(`Order #${res.data.orderNumber} placed — ₹${res.data.total}!`);
 
             setTranscripts(prev => [...prev, {
                 role: 'system',
-                text: `✅ Order #${res.data.orderNumber} placed successfully! Total: ₹${res.data.total}`,
+                text: `✅ Order #${res.data.orderNumber} placed successfully!\nTotal: ₹${res.data.total}`,
                 ts: Date.now(),
             }]);
 
-            setOrderResult(null);
+            setOrderResult({ ...parsedOrder, placed: true, orderNumber: res.data.orderNumber, total: res.data.total });
         } catch (err) {
             toast.error(err.message || 'Failed to place order');
+            setOrderResult(null);
         } finally {
             setPlacingOrder(false);
         }
@@ -359,7 +366,7 @@ RULES:
                     {/* Order confirmation card */}
                     {orderResult && (
                         <div className="vo-order-card animate-fade-in-up">
-                            <h3><HiOutlineShoppingBag size={18} /> Order Summary</h3>
+                            <h3><HiOutlineShoppingBag size={18} /> {orderResult.placed ? 'Order Confirmed ✅' : 'Placing Order...'}</h3>
                             <div className="vo-order-items">
                                 {orderResult.items.map((item, i) => (
                                     <div key={i} className="vo-order-item">
@@ -367,19 +374,15 @@ RULES:
                                     </div>
                                 ))}
                             </div>
-                            <div className="vo-order-actions">
-                                <button
-                                    className="btn btn-primary btn-lg"
-                                    onClick={confirmOrder}
-                                    disabled={placingOrder}
-                                    style={{ flex: 1 }}
-                                >
-                                    {placingOrder ? 'Placing Order...' : '✅ Confirm & Place Order'}
-                                </button>
-                                <button className="btn btn-secondary" onClick={() => setOrderResult(null)}>
-                                    Cancel
-                                </button>
-                            </div>
+                            {orderResult.placed ? (
+                                <div style={{ padding: '8px 0', fontSize: 14, fontWeight: 700, color: 'var(--success-600)' }}>
+                                    Order #{orderResult.orderNumber} — Total: ₹{orderResult.total}
+                                </div>
+                            ) : (
+                                <div style={{ padding: '8px 0', fontSize: 13, color: 'var(--neutral-500)' }}>
+                                    Placing your order automatically...
+                                </div>
+                            )}
                         </div>
                     )}
 

@@ -12,7 +12,6 @@ import RiskDetection from './pages/owner/RiskDetection';
 import Recommendations from './pages/owner/Recommendations';
 import PriceOptimization from './pages/owner/PriceOptimization';
 import Suggestions from './pages/owner/Suggestions';
-import VoiceCopilot from './pages/customer/VoiceCopilot';
 import VoiceOrder from './pages/customer/VoiceOrder';
 import OrderHistory from './pages/customer/OrderHistory';
 import SetupRestaurant from './pages/owner/SetupRestaurant';
@@ -31,7 +30,7 @@ function ProtectedRoute({ children, role }) {
 
   if (!user) return <Navigate to="/login" />;
   if (role && user.role !== role) {
-    return <Navigate to={user.role === 'owner' ? '/owner/dashboard' : '/order'} />;
+    return <Navigate to={user.role === 'owner' ? '/owner/dashboard' : '/voice-order'} />;
   }
 
   return children;
@@ -51,8 +50,8 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to={user.role === 'owner' ? '/owner/dashboard' : '/order'} /> : <LoginPage />} />
-      <Route path="/register" element={user ? <Navigate to={user.role === 'owner' ? '/owner/dashboard' : '/order'} /> : <RegisterPage />} />
+      <Route path="/login" element={user ? <Navigate to={user.role === 'owner' ? '/owner/dashboard' : '/voice-order'} /> : <LoginPage />} />
+      <Route path="/register" element={user ? <Navigate to={user.role === 'owner' ? '/owner/dashboard' : '/voice-order'} /> : <RegisterPage />} />
 
       {/* Owner Routes */}
       <Route path="/owner/dashboard" element={<ProtectedRoute role="owner"><OwnerDashboard /></ProtectedRoute>} />
@@ -66,7 +65,6 @@ function AppRoutes() {
       <Route path="/owner/combo-pricing" element={<ProtectedRoute role="owner"><PriceOptimization /></ProtectedRoute>} />
       <Route path="/owner/setup" element={<ProtectedRoute role="owner"><SetupRestaurant /></ProtectedRoute>} />
       {/* Customer Routes */}
-      <Route path="/order" element={<ProtectedRoute role="customer"><VoiceCopilot /></ProtectedRoute>} />
       <Route path="/voice-order" element={<ProtectedRoute role="customer"><VoiceOrder /></ProtectedRoute>} />
       <Route path="/order-history" element={<ProtectedRoute role="customer"><OrderHistory /></ProtectedRoute>} />
 
