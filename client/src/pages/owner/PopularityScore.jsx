@@ -137,7 +137,7 @@ export default function PopularityScore() {
                                         <th>Total Sold (30d)</th>
                                         <th>Orders / Day</th>
                                         <th>Trend</th>
-                                        <th>Result</th>
+                                        <th>Rate</th>
                                     </tr>
                                 </thead>
                                 <tbody>
