@@ -128,8 +128,7 @@ BEGIN
 
         -- 4. Generate Orders for the past 30 days
         FOR v_day IN 0..30 LOOP
-            v_order_date := (CURRENT_DATE - INTERVAL '1 day' * (30 - v_day)) + INTERVAL '12 hours';
-            v_is_weekend := EXTRACT(DOW FROM v_order_date) IN (0, 6);
+            v_is_weekend := EXTRACT(DOW FROM CURRENT_DATE - INTERVAL '1 day' * (30 - v_day)) IN (0, 6);
             
             -- Generate between 8 and 25 orders per day on weekdays
             v_orders_today := floor(random() * 18 + 8);
@@ -140,6 +139,15 @@ BEGIN
             END IF;
             
             FOR i IN 1..v_orders_today LOOP
+                -- Generate a random time between 11 AM and 10 PM
+                v_order_date := (CURRENT_DATE - INTERVAL '1 day' * (30 - v_day))
+                              + make_interval(hours => floor(random() * 12 + 11)::int, mins => floor(random() * 60)::int);
+                
+                -- Cap future dates if it's today
+                IF v_order_date > CURRENT_TIMESTAMP THEN
+                    v_order_date := CURRENT_TIMESTAMP - make_interval(mins => floor(random() * 60 + 1)::int);
+                END IF;
+
                 -- Create the root order utilizing gen_random_uuid logic mapped to hex
                 INSERT INTO orders (user_id, restaurant_id, order_number, status, subtotal, tax, total, created_at, updated_at, ai_upsell_accepted)
                 VALUES (v_user_id, v_restaurant.id, 'SYNTH-' || substr(md5(random()::text), 1, 8) || '-' || v_day || '-' || i, 'delivered', 0, 0, 0, v_order_date, v_order_date, (random() > 0.8))

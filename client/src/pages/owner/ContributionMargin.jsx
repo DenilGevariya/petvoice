@@ -59,8 +59,7 @@ export default function ContributionMargin() {
 
     const formatDate = (d) => {
         const dt = new Date(d);
-        return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' }) +
-            ' ' + dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })
     };
 
     const profitColor = (profit) => {
