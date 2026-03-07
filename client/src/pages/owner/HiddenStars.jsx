@@ -104,7 +104,7 @@ export default function HiddenStars() {
                                 </div>
 
                                 {/* AI Recommendations */}
-                                {data.aiRecommendations && data.aiRecommendations[idx] && (
+                                {/* {data.aiRecommendations && data.aiRecommendations[idx] && (
                                     <div style={{ background: 'linear-gradient(135deg, var(--accent-50), var(--brand-50))', borderRadius: 'var(--radius-md)', padding: 16 }}>
                                         <h4 style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent-700)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                                             <HiOutlineSparkles /> AI Recommendations
@@ -133,7 +133,7 @@ export default function HiddenStars() {
                                             </div>
                                         )}
                                     </div>
-                                )}
+                                )} */}
                             </div>
                         ))}
                     </div>

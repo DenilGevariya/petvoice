@@ -37,15 +37,8 @@ export default function OwnerLayout({ children }) {
         <div className="app-layout">
             {/* Mobile menu button */}
             <button
-                className="btn btn-ghost btn-icon"
+                className="btn btn-ghost btn-icon mobile-menu-btn"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                style={{
-                    position: 'fixed',
-                    top: 16,
-                    left: 16,
-                    zIndex: 200,
-                    display: 'none',
-                }}
                 id="mobile-menu-btn"
             >
                 {sidebarOpen ? <HiOutlineX size={24} /> : <HiOutlineMenu size={24} />}

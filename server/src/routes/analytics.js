@@ -53,7 +53,7 @@ router.get('/dashboard/:restaurantId', authMiddleware, ownerMiddleware, async (r
         // ── This month's stats ──
         const monthOrders = await query(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
-             FROM orders WHERE restaurant_id = $1 AND created_at >= DATE_TRUNC('month', CURRENT_DATE)`,
+             FROM orders WHERE restaurant_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '30 days'`,
             [restaurantId]
         );
 
@@ -62,7 +62,7 @@ router.get('/dashboard/:restaurantId', authMiddleware, ownerMiddleware, async (r
              FROM order_items oi
              JOIN orders o ON oi.order_id = o.id
              JOIN menu_items mi ON oi.menu_item_id = mi.id
-             WHERE o.restaurant_id = $1 AND o.created_at >= DATE_TRUNC('month', CURRENT_DATE)`,
+             WHERE o.restaurant_id = $1 AND o.created_at >= CURRENT_DATE - INTERVAL '30 days'`,
             [restaurantId]
         );
 

@@ -3252,3 +3252,42 @@ img {
     max-width: 90%;
   }
 }
+
+/* ============================================
+   MOBILE LAYOUT FIXES
+   ============================================ */
+
+#mobile-menu-btn {
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 200;
+  background: var(--surface-card);
+  border: 1px solid var(--neutral-200);
+  box-shadow: var(--shadow-sm);
+  color: var(--neutral-600);
+}
+
+#mobile-menu-btn:hover {
+  background: var(--neutral-100);
+}
+
+@media (max-width: 1024px) {
+  #mobile-menu-btn {
+    display: flex;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: var(--shadow-2xl);
+  }
+
+  .main-content {
+    margin-left: 0;
+  }
+}
