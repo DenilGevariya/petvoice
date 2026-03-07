@@ -62,7 +62,7 @@ function AppRoutes() {
       <Route path="/owner/risk-detection" element={<ProtectedRoute role="owner"><RiskDetection /></ProtectedRoute>} />
       <Route path="/owner/popularity-score" element={<ProtectedRoute role="owner"><PopularityScore /></ProtectedRoute>} />
       <Route path="/owner/hidden-stars" element={<ProtectedRoute role="owner"><HiddenStars /></ProtectedRoute>} />
-      <Route path="/owner/combo-pricing" element={<ProtectedRoute role="owner"><PriceOptimization /></ProtectedRoute>} />
+      {/* <Route path="/owner/combo-pricing" element={<ProtectedRoute role="owner"><PriceOptimization /></ProtectedRoute>} /> */}
       <Route path="/owner/setup" element={<ProtectedRoute role="owner"><SetupRestaurant /></ProtectedRoute>} />
       {/* Customer Routes */}
       <Route path="/voice-order" element={<ProtectedRoute role="customer"><VoiceOrder /></ProtectedRoute>} />

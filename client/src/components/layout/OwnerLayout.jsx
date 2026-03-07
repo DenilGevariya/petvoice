@@ -20,7 +20,7 @@ const intelligenceNav = [
     { path: '/owner/risk-detection', label: 'Risk Detection', icon: HiOutlineExclamationCircle },
     { path: '/owner/popularity-score', label: 'Popularity Score', icon: HiOutlineTrendingUp },
     { path: '/owner/hidden-stars', label: 'Hidden Stars', icon: HiOutlineStar },
-    { path: '/owner/combo-pricing', label: 'Combo & Pricing', icon: HiOutlineCurrencyDollar },
+    // { path: '/owner/combo-pricing', label: 'Combo & Pricing', icon: HiOutlineCurrencyDollar },
 ];
 
 export default function OwnerLayout({ children }) {
