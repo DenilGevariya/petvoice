@@ -39,6 +39,10 @@ export default function MenuManager() {
     const [editingCombo, setEditingCombo] = useState(null);
     const [comboForm, setComboForm] = useState({ name: '', description: '', comboPrice: '', items: [] });
 
+    // BOGO Form State
+    const [showAddBogo, setShowAddBogo] = useState(false);
+    const [selectedBogoItem, setSelectedBogoItem] = useState('');
+
     useEffect(() => { loadData(); }, []);
 
     const loadData = async () => {
@@ -220,6 +224,27 @@ export default function MenuManager() {
 
     // ================= BOGO LOGIC =================
 
+    const handleCreateBogo = async (e) => {
+        e.preventDefault();
+        if (!selectedBogoItem) return toast.error('Please select an item');
+
+        const item = menuItems.find(i => i.id === selectedBogoItem);
+        if (!item) return;
+
+        try {
+            await api.updateMenuItem(item.id, {
+                ...item,
+                isBogo: true
+            });
+            toast.success('BOGO offer created specifically for ' + item.name);
+            setShowAddBogo(false);
+            setSelectedBogoItem('');
+            loadData();
+        } catch (err) {
+            toast.error(err.message);
+        }
+    };
+
     const toggleBogoStatus = async (item) => {
         try {
             await api.updateMenuItem(item.id, {
@@ -271,6 +296,11 @@ export default function MenuManager() {
                     {activeTab === 'combos' && (
                         <button className="btn btn-primary" onClick={() => { resetComboForm(); setShowAddCombo(true); }}>
                             <HiOutlinePlus size={16} /> Add Combo
+                        </button>
+                    )}
+                    {activeTab === 'bogo' && (
+                        <button className="btn btn-primary" onClick={() => setShowAddBogo(true)}>
+                            <HiOutlinePlus size={16} /> Create BOGO
                         </button>
                     )}
                 </div>
@@ -425,54 +455,55 @@ export default function MenuManager() {
                 {/* ================= TAB: BOGO OFFERS ================= */}
                 {activeTab === 'bogo' && (
                     <>
-                        <div className="menu-cards-grid stagger-children">
-                            {menuItems.map((item) => (
-                                <div key={item.id} className="menu-card animate-fade-in-up" style={{
-                                    border: item.isBogo ? '2px solid var(--brand-500)' : '1px solid var(--neutral-200)'
-                                }}>
-                                    <div className="menu-card-image">
-                                        {item.imageUrl ? (
-                                            <img src={item.imageUrl} alt={item.name} />
-                                        ) : (
-                                            <div className="menu-card-placeholder">
-                                                <HiOutlinePhotograph size={32} />
-                                                <span>No image</span>
-                                            </div>
-                                        )}
-                                        {item.isBogo && (
+                        {bogoItems.length > 0 ? (
+                            <div className="menu-cards-grid stagger-children">
+                                {bogoItems.map((item) => (
+                                    <div key={item.id} className="menu-card animate-fade-in-up" style={{
+                                        border: '2px solid var(--brand-500)'
+                                    }}>
+                                        <div className="menu-card-image">
+                                            {item.imageUrl ? (
+                                                <img src={item.imageUrl} alt={item.name} />
+                                            ) : (
+                                                <div className="menu-card-placeholder">
+                                                    <HiOutlinePhotograph size={32} />
+                                                    <span>No image</span>
+                                                </div>
+                                            )}
                                             <div className="menu-card-badge" style={{ background: 'var(--brand-500)' }}>⭐ ACTIVE BOGO</div>
-                                        )}
-                                    </div>
-
-                                    <div className="menu-card-body">
-                                        <div className="menu-card-name">
-                                            {item.name}
-                                        </div>
-                                        <div className="menu-card-pricing">
-                                            <div className="menu-card-price">₹{item.price}</div>
                                         </div>
 
-                                        {item.isBogo && (
+                                        <div className="menu-card-body">
+                                            <div className="menu-card-name">
+                                                {item.name}
+                                            </div>
+                                            <div className="menu-card-pricing">
+                                                <div className="menu-card-price">₹{item.price}</div>
+                                            </div>
+
                                             <div style={{ fontSize: '13px', color: 'var(--brand-600)', background: 'var(--brand-50)', padding: '6px', borderRadius: '4px', margin: '8px 0', textAlign: 'center', fontWeight: 'bold' }}>
                                                 Buy 1, Get 1 Free!
                                             </div>
-                                        )}
 
-                                        <div className="menu-card-actions" style={{ marginTop: '12px' }}>
-                                            {item.isBogo ? (
+                                            <div className="menu-card-actions" style={{ marginTop: '12px' }}>
                                                 <button className="btn btn-sm w-full" style={{ background: 'var(--error-50)', color: 'var(--error-600)' }} onClick={() => toggleBogoStatus(item)}>
                                                     <HiOutlineX size={14} /> Remove Offer
                                                 </button>
-                                            ) : (
-                                                <button className="btn btn-sm btn-secondary w-full" onClick={() => toggleBogoStatus(item)}>
-                                                    <HiOutlineGift size={14} /> Activate BOGO
-                                                </button>
-                                            )}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="empty-state">
+                                <div className="empty-state-icon">🎁</div>
+                                <h3>No active BOGO offers</h3>
+                                <p>Create a Buy One Get One Free offer to drive sales for specific items.</p>
+                                <button className="btn btn-primary" onClick={() => setShowAddBogo(true)}>
+                                    <HiOutlinePlus size={16} /> Create BOGO
+                                </button>
+                            </div>
+                        )}
                     </>
                 )}
 
@@ -635,6 +666,40 @@ export default function MenuManager() {
                                 <div className="modal-footer" style={{ padding: 0, marginTop: '20px' }}>
                                     <button type="button" className="btn btn-secondary" onClick={resetComboForm}>Cancel</button>
                                     <button type="submit" className="btn btn-primary"><HiOutlineCheck size={16} /> Save Combo</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Add BOGO Modal */}
+                {showAddBogo && (
+                    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowAddBogo(false)}>
+                        <div className="modal" style={{ maxWidth: 420 }}>
+                            <div className="modal-header">
+                                <h2>Create BOGO Offer</h2>
+                                <button className="modal-close" onClick={() => setShowAddBogo(false)}><HiOutlineX size={20} /></button>
+                            </div>
+                            <form className="modal-body" onSubmit={handleCreateBogo}>
+                                <div className="form-group">
+                                    <label className="form-label">Select Item for Promotion *</label>
+                                    <select
+                                        className="form-input form-select"
+                                        value={selectedBogoItem}
+                                        onChange={(e) => setSelectedBogoItem(e.target.value)}
+                                    >
+                                        <option value="">Select Item</option>
+                                        {menuItems.filter(i => !i.isBogo).map(mi => (
+                                            <option key={mi.id} value={mi.id}>{mi.name} (₹{mi.price})</option>
+                                        ))}
+                                    </select>
+                                    <div style={{ fontSize: '11px', color: 'var(--neutral-500)', marginTop: '4px' }}>
+                                        Setting an item to BOGO will offer "Buy 1 Get 1 Free" to customers.
+                                    </div>
+                                </div>
+                                <div className="modal-footer" style={{ padding: 0, marginTop: '20px' }}>
+                                    <button type="button" className="btn btn-secondary" onClick={() => setShowAddBogo(false)}>Cancel</button>
+                                    <button type="submit" className="btn btn-primary"><HiOutlineCheck size={16} /> Activate BOGO</button>
                                 </div>
                             </form>
                         </div>
