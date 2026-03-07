@@ -13,8 +13,8 @@ function classifyMarginLevel(marginPct) {
 function classifyRisk(marginPct, ordersPerDay) {
     const lowMargin = marginPct < 30;
     const highMargin = marginPct >= 30;
-    const lowOrders = ordersPerDay < 2;
-    const highOrders = ordersPerDay >= 2;
+    const lowOrders = ordersPerDay < 20;
+    const highOrders = ordersPerDay >= 20;
 
     if (lowMargin && lowOrders) return { label: 'High', color: 'var(--error-500)', bg: 'var(--error-50, #fef2f2)', icon: '🔴' };
     if (highMargin && highOrders) return { label: 'Low', color: 'var(--success-600)', bg: 'var(--success-50)', icon: '🟢' };

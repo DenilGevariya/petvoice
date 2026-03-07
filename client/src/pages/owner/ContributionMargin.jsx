@@ -140,10 +140,10 @@ export default function ContributionMargin() {
                                         </th>
                                         <th>Items Ordered</th>
                                         <th style={{ cursor: 'pointer' }} onClick={() => handleSort('sellingTotal')}>
-                                            Selling Price <SortIcon field="sellingTotal" />
+                                            Total Selling Price <SortIcon field="sellingTotal" />
                                         </th>
                                         <th style={{ cursor: 'pointer' }} onClick={() => handleSort('costTotal')}>
-                                            Cost Price <SortIcon field="costTotal" />
+                                            Total Cost Price <SortIcon field="costTotal" />
                                         </th>
                                         <th style={{ cursor: 'pointer' }} onClick={() => handleSort('profit')}>
                                             Profit <SortIcon field="profit" />
